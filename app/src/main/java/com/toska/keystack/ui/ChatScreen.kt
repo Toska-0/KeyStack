@@ -894,6 +894,20 @@ fun MessageBubble(
                 }
             }
         }
+        if (isUser && !msg.isStreaming) {
+            Row {
+                TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "Изменить", modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Изменить", style = MaterialTheme.typography.labelMedium)
+                }
+                TextButton(onClick = onBranch, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text("↳", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Ветка", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
         if (!isUser && !msg.isStreaming && msg.content.isNotBlank()) {
             Row(
                 modifier = Modifier.padding(start = 8.dp, top = 2.dp),
