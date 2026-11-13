@@ -810,7 +810,6 @@ private fun ComposerBar(
                 DropdownMenuItem(text = { Text("Фото / картинка") }, onClick = { onDismissAttach(); onPickImages() })
                 DropdownMenuItem(text = { Text("Файл") }, onClick = { onDismissAttach(); onPickFiles() })
                 DropdownMenuItem(text = { Text("Недавние вложения") }, onClick = { onDismissAttach(); onPickRecent() })
-                DropdownMenuItem(text = { Text("Недавние вложения") }, onClick = { onDismissAttach(); onPickRecent() })
             }
         }
         OutlinedTextField(
