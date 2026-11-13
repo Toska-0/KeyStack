@@ -12,7 +12,11 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 @Serializable
-data class StoredMessage(val role: String, val content: String)
+data class StoredMessage(
+    val role: String,
+    val content: String,
+    val images: List<String> = emptyList()
+)
 
 @Serializable
 data class ChatSession(

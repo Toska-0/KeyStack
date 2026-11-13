@@ -34,6 +34,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,6 +42,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,6 +62,7 @@ import kotlinx.coroutines.delay
 fun SetupScreen(
     initial: Settings,
     onDone: (providerId: String, apiKey: String, model: String, baseUrl: String) -> Unit,
+    onSaveTheme: (themeMode: String, dynamicColor: Boolean) -> Unit,
     onBack: (() -> Unit)? = null
 ) {
     var selectedId by remember { mutableStateOf(initial.providerId.ifBlank { Providers.all.first().id }) }
@@ -70,6 +73,15 @@ fun SetupScreen(
     var showSheet by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
 
+    var themeMode by remember { mutableStateOf(initial.themeMode) }
+    var dynamicColor by remember { mutableStateOf(initial.dynamicColor) }
+
+    // Черновики полей по провайдерам — чтобы ввод не терялся при переключении
+    val draftKeys = remember { mutableStateMapOf<String, String>() }
+    val draftModels = remember { mutableStateMapOf<String, String>() }
+    val draftBaseUrls = remember { mutableStateMapOf<String, String>() }
+    var prevId by remember { mutableStateOf(selectedId) }
+
     var fetchedModels by remember { mutableStateOf<List<String>?>(null) }
     var loadingModels by remember { mutableStateOf(false) }
     var fetchFailed by remember { mutableStateOf(false) }
@@ -78,6 +90,19 @@ fun SetupScreen(
     val uriHandler = LocalUriHandler.current
     val client = remember { LlmClient() }
     val effectiveUrl = if (provider.needsBaseUrl) baseUrl.trim() else provider.baseUrl
+
+    // При смене провайдера — подставляем его сохранённые ключ/модель/baseURL
+    LaunchedEffect(selectedId) {
+        if (selectedId != prevId) {
+            draftKeys[prevId] = apiKey
+            draftModels[prevId] = model
+            draftBaseUrls[prevId] = baseUrl
+            apiKey = draftKeys[selectedId] ?: initial.savedKeys[selectedId] ?: ""
+            model = draftModels[selectedId] ?: initial.savedModels[selectedId] ?: ""
+            baseUrl = draftBaseUrls[selectedId] ?: initial.savedBaseUrls[selectedId] ?: ""
+            prevId = selectedId
+        }
+    }
 
     // Автозагрузка моделей по ключу (с debounce на ввод)
     LaunchedEffect(selectedId, apiKey, effectiveUrl) {
@@ -122,16 +147,18 @@ fun SetupScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Выбери провайдера", style = MaterialTheme.typography.titleMedium)
+            Text("Провайдеры и ключи", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Для каждого провайдера сохраняется свой ключ — переключайся в один тап.",
+                style = MaterialTheme.typography.bodySmall
+            )
 
             Providers.all.forEach { p ->
+                val hasKey = initial.savedKeys[p.id]?.isNotBlank() == true
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            selectedId = p.id
-                            if (model !in p.models) model = p.models.firstOrNull() ?: ""
-                        },
+                        .clickable { selectedId = p.id },
                     colors = if (p.id == selectedId)
                         CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     else
@@ -140,13 +167,17 @@ fun SetupScreen(
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
                             selected = p.id == selectedId,
-                            onClick = {
-                                selectedId = p.id
-                                if (model !in p.models) model = p.models.firstOrNull() ?: ""
-                            }
+                            onClick = { selectedId = p.id }
                         )
                         Column {
                             Text(p.name, style = MaterialTheme.typography.bodyLarge)
+                            if (hasKey) {
+                                Text(
+                                    "Ключ сохранён",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             if (p.keyUrl.isNotBlank()) {
                                 Text(
                                     "Получить API-ключ",
@@ -173,7 +204,7 @@ fun SetupScreen(
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
-                label = { Text("API-ключ") },
+                label = { Text("API-ключ для " + provider.name) },
                 singleLine = true,
                 visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -253,8 +284,55 @@ fun SetupScreen(
                 Text("Сохранить и открыть чат")
             }
 
+            Text("Оформление", style = MaterialTheme.typography.titleMedium)
+
+            val themes = listOf(
+                "system" to "Как в системе",
+                "light" to "Светлая",
+                "dark" to "Тёмная",
+                "amoled" to "AMOLED (чёрная)"
+            )
+            themes.forEach { (id, label) ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            themeMode = id
+                            onSaveTheme(id, dynamicColor)
+                        },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = themeMode == id,
+                        onClick = {
+                            themeMode = id
+                            onSaveTheme(id, dynamicColor)
+                        }
+                    )
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Динамические цвета (Material You)",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = dynamicColor,
+                    onCheckedChange = {
+                        dynamicColor = it
+                        onSaveTheme(themeMode, it)
+                    }
+                )
+            }
+
             Text(
-                "Ключ хранится только на устройстве и отправляется напрямую провайдеру.",
+                "Ключи хранятся только на устройстве и отправляются напрямую провайдерам.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(24.dp))

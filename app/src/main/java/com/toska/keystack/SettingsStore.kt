@@ -1,11 +1,15 @@
 package com.toska.keystack
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private val Context.dataStore by preferencesDataStore(name = "keystack")
 
@@ -13,31 +17,92 @@ data class Settings(
     val providerId: String,
     val apiKey: String,
     val model: String,
-    val baseUrl: String
+    val baseUrl: String,
+    val themeMode: String = "system",
+    val dynamicColor: Boolean = true,
+    val savedKeys: Map<String, String> = emptyMap(),
+    val savedModels: Map<String, String> = emptyMap(),
+    val savedBaseUrls: Map<String, String> = emptyMap()
+)
+
+/** Ключи/модели/baseURL хранятся отдельно для каждого провайдера. */
+@Serializable
+private data class ProviderCreds(
+    val keys: Map<String, String> = emptyMap(),
+    val models: Map<String, String> = emptyMap(),
+    val baseUrls: Map<String, String> = emptyMap()
 )
 
 class SettingsStore(private val context: Context) {
 
     private val keyProvider = stringPreferencesKey("provider")
-    private val keyApi = stringPreferencesKey("api_key")
-    private val keyModel = stringPreferencesKey("model")
-    private val keyBase = stringPreferencesKey("base_url")
+    private val keyApi = stringPreferencesKey("api_key") // legacy
+    private val keyModel = stringPreferencesKey("model") // legacy
+    private val keyBase = stringPreferencesKey("base_url") // legacy
+    private val keyCreds = stringPreferencesKey("creds_json")
+    private val keyTheme = stringPreferencesKey("theme_mode")
+    private val keyDynamic = stringPreferencesKey("dynamic_color")
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun parseCreds(raw: String?): ProviderCreds =
+        raw?.let { runCatching { json.decodeFromString<ProviderCreds>(it) }.getOrNull() } ?: ProviderCreds()
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
+        var creds = parseCreds(p[keyCreds])
+        val providerId = p[keyProvider] ?: ""
+        // Разовая миграция старых настроек (один ключ на всё приложение)
+        if (creds.keys.isEmpty() && !p[keyApi].isNullOrBlank()) {
+            creds = ProviderCreds(
+                keys = mapOf(providerId to (p[keyApi] ?: "")),
+                models = mapOf(providerId to (p[keyModel] ?: "")),
+                baseUrls = mapOf(providerId to (p[keyBase] ?: ""))
+            )
+        }
         Settings(
-            providerId = p[keyProvider] ?: "",
-            apiKey = p[keyApi] ?: "",
-            model = p[keyModel] ?: "",
-            baseUrl = p[keyBase] ?: ""
+            providerId = providerId,
+            apiKey = creds.keys[providerId] ?: "",
+            model = creds.models[providerId] ?: "",
+            baseUrl = creds.baseUrls[providerId] ?: "",
+            themeMode = p[keyTheme] ?: "system",
+            dynamicColor = p[keyDynamic] ?: true,
+            savedKeys = creds.keys,
+            savedModels = creds.models,
+            savedBaseUrls = creds.baseUrls
         )
     }
 
-    suspend fun save(providerId: String, apiKey: String, model: String, baseUrl: String) {
+    private suspend fun updateCreds(transform: (ProviderCreds) -> ProviderCreds) {
         context.dataStore.edit { p ->
-            p[keyProvider] = providerId
-            p[keyApi] = apiKey
-            p[keyModel] = model
-            p[keyBase] = baseUrl
+            val updated = transform(parseCreds(p[keyCreds]))
+            p[keyCreds] = json.encodeToString(updated)
+        }
+    }
+
+    /** Сохраняет ключ/модель/baseURL для конкретного провайдера и делает его активным. */
+    suspend fun saveProviderCreds(providerId: String, apiKey: String, model: String, baseUrl: String) {
+        updateCreds { c ->
+            c.copy(
+                keys = c.keys + (providerId to apiKey),
+                models = c.models + (providerId to model),
+                baseUrls = if (baseUrl.isNotBlank()) c.baseUrls + (providerId to baseUrl) else c.baseUrls
+            )
+        }
+        context.dataStore.edit { p -> p[keyProvider] = providerId }
+    }
+
+    suspend fun setActiveProvider(providerId: String) {
+        context.dataStore.edit { p -> p[keyProvider] = providerId }
+    }
+
+    suspend fun saveModel(providerId: String, model: String) {
+        updateCreds { c -> c.copy(models = c.models + (providerId to model)) }
+    }
+
+    suspend fun saveTheme(themeMode: String, dynamicColor: Boolean) {
+        context.dataStore.edit { p ->
+            p[keyTheme] = themeMode
+            p[keyDynamic] = dynamicColor
         }
     }
 }

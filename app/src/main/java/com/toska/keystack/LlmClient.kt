@@ -22,7 +22,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-data class ChatMessage(val role: String, val content: String)
+/** images — data URI вида "data:image/jpeg;base64,..." */
+data class ChatMessage(val role: String, val content: String, val images: List<String> = emptyList())
 
 sealed interface StreamEvent {
     data class Delta(val text: String) : StreamEvent
@@ -191,6 +192,14 @@ class LlmClient {
 
     private fun jsonBody(body: String) = body.toRequestBody("application/json".toMediaType())
 
+    /** "data:image/jpeg;base64,XXX" -> ("image/jpeg", "XXX") */
+    private fun splitDataUri(uri: String): Pair<String, String> {
+        val marker = ";base64,"
+        val idx = uri.indexOf(marker)
+        if (idx < 0) return "image/jpeg" to ""
+        return uri.substring("data:".length, idx) to uri.substring(idx + marker.length)
+    }
+
     private fun openAiRequest(base: String, apiKey: String, model: String, messages: List<ChatMessage>): Request {
         val body = buildJsonObject {
             put("model", model)
@@ -199,7 +208,22 @@ class LlmClient {
                 messages.forEach { m ->
                     add(buildJsonObject {
                         put("role", m.role)
-                        put("content", m.content)
+                        if (m.images.isEmpty()) {
+                            put("content", m.content)
+                        } else {
+                            put("content", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("type", "text")
+                                    put("text", m.content)
+                                })
+                                m.images.forEach { img ->
+                                    add(buildJsonObject {
+                                        put("type", "image_url")
+                                        put("image_url", buildJsonObject { put("url", img) })
+                                    })
+                                }
+                            })
+                        }
                     })
                 }
             })
@@ -222,7 +246,27 @@ class LlmClient {
                 messages.filter { it.role != "system" }.forEach { m ->
                     add(buildJsonObject {
                         put("role", m.role)
-                        put("content", m.content)
+                        if (m.images.isEmpty()) {
+                            put("content", m.content)
+                        } else {
+                            put("content", buildJsonArray {
+                                m.images.forEach { img ->
+                                    val (mime, data) = splitDataUri(img)
+                                    add(buildJsonObject {
+                                        put("type", "image")
+                                        put("source", buildJsonObject {
+                                            put("type", "base64")
+                                            put("media_type", mime)
+                                            put("data", data)
+                                        })
+                                    })
+                                }
+                                add(buildJsonObject {
+                                    put("type", "text")
+                                    put("text", m.content)
+                                })
+                            })
+                        }
                     })
                 }
             })
@@ -247,7 +291,18 @@ class LlmClient {
                 messages.filter { it.role != "system" }.forEach { m ->
                     add(buildJsonObject {
                         put("role", if (m.role == "assistant") "model" else "user")
-                        put("parts", buildJsonArray { add(buildJsonObject { put("text", m.content) }) })
+                        put("parts", buildJsonArray {
+                            m.images.forEach { img ->
+                                val (mime, data) = splitDataUri(img)
+                                add(buildJsonObject {
+                                    put("inline_data", buildJsonObject {
+                                        put("mime_type", mime)
+                                        put("data", data)
+                                    })
+                                })
+                            }
+                            add(buildJsonObject { put("text", m.content) })
+                        })
                     })
                 }
             })

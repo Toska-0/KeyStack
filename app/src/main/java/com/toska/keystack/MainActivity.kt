@@ -22,32 +22,38 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            KeyStackTheme {
-                val settingsStore = remember { SettingsStore(applicationContext) }
-                val chatStore = remember { ChatStore(applicationContext) }
-                val vm: ChatViewModel = viewModel()
-                val scope = rememberCoroutineScope()
+            val settingsStore = remember { SettingsStore(applicationContext) }
+            val chatStore = remember { ChatStore(applicationContext) }
+            val vm: ChatViewModel = viewModel()
+            val scope = rememberCoroutineScope()
 
-                LaunchedEffect(Unit) { vm.init(settingsStore, chatStore) }
+            LaunchedEffect(Unit) { vm.init(settingsStore, chatStore) }
 
-                val settings by vm.settings.collectAsState()
-                var showSetup by remember { mutableStateOf(true) }
+            val settings by settingsStore.settings.collectAsState(initial = Settings("", "", "", ""))
+            var showSetup by remember { mutableStateOf(true) }
 
-                LaunchedEffect(settings.providerId, settings.apiKey, settings.model) {
-                    if (settings.providerId.isNotBlank() &&
-                        settings.apiKey.isNotBlank() &&
-                        settings.model.isNotBlank()
-                    ) {
-                        showSetup = false
-                    }
+            LaunchedEffect(settings.providerId, settings.apiKey, settings.model) {
+                if (settings.providerId.isNotBlank() &&
+                    settings.apiKey.isNotBlank() &&
+                    settings.model.isNotBlank()
+                ) {
+                    showSetup = false
                 }
+            }
 
+            KeyStackTheme(
+                themeMode = settings.themeMode,
+                dynamicColor = settings.dynamicColor
+            ) {
                 if (showSetup) {
                     SetupScreen(
                         initial = settings,
                         onDone = { p, k, m, b ->
-                            scope.launch { settingsStore.save(p, k, m, b) }
+                            scope.launch { settingsStore.saveProviderCreds(p, k, m, b) }
                             showSetup = false
+                        },
+                        onSaveTheme = { mode, dyn ->
+                            scope.launch { settingsStore.saveTheme(mode, dyn) }
                         },
                         onBack = if (settings.providerId.isNotBlank() && settings.apiKey.isNotBlank()) {
                             { showSetup = false }

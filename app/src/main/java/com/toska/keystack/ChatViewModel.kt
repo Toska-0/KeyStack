@@ -7,7 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-data class UiMessage(val role: String, val content: String, val isStreaming: Boolean = false)
+data class UiMessage(
+    val role: String,
+    val content: String,
+    val isStreaming: Boolean = false,
+    val images: List<String> = emptyList()
+)
 
 class ChatViewModel : ViewModel() {
 
@@ -50,7 +55,7 @@ class ChatViewModel : ViewModel() {
             _sessions.value = loaded
             val first = loaded.firstOrNull { it.pinned } ?: loaded.firstOrNull()
             _currentId.value = first?.id
-            _messages.value = first?.messages?.map { UiMessage(it.role, it.content) } ?: emptyList()
+            _messages.value = first?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
         }
     }
 
@@ -61,7 +66,7 @@ class ChatViewModel : ViewModel() {
 
     private fun persistCurrentMessages() {
         val id = _currentId.value ?: return
-        val stored = _messages.value.filter { !it.isStreaming }.map { StoredMessage(it.role, it.content) }
+        val stored = _messages.value.filter { !it.isStreaming }.map { StoredMessage(it.role, it.content, it.images) }
         _sessions.value = _sessions.value.map {
             if (it.id == id) it.copy(updatedAt = System.currentTimeMillis(), messages = stored) else it
         }
@@ -96,7 +101,7 @@ class ChatViewModel : ViewModel() {
         stop()
         _currentId.value = id
         _messages.value = _sessions.value.firstOrNull { it.id == id }
-            ?.messages?.map { UiMessage(it.role, it.content) } ?: emptyList()
+            ?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
         _error.value = null
     }
 
@@ -122,26 +127,23 @@ class ChatViewModel : ViewModel() {
         if (wasCurrent) {
             val next = _sessions.value.firstOrNull()
             _currentId.value = next?.id
-            _messages.value = next?.messages?.map { UiMessage(it.role, it.content) } ?: emptyList()
+            _messages.value = next?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
         }
         persist()
     }
 
-    fun send(text: String) {
+    fun send(text: String, images: List<String> = emptyList()) {
         val s = _settings.value
-        if (text.isBlank() || _busy.value || s.apiKey.isBlank() || s.model.isBlank()) return
+        if ((text.isBlank() && images.isEmpty()) || _busy.value || s.apiKey.isBlank() || s.model.isBlank()) return
 
         var session = _sessions.value.firstOrNull { it.id == _currentId.value }
         if (session == null) session = openSession(s.providerId, s.model)
         val sessionId = session.id
 
-        val user = UiMessage("user", text.trim())
+        val user = UiMessage("user", text.trim(), images = images)
         val history = _messages.value + user
-        _messages.value = history + UiMessage("assistant", "", isStreaming = true)
-        _busy.value = true
-        _error.value = null
 
-        val stored = history.map { StoredMessage(it.role, it.content) }
+        val stored = history.map { StoredMessage(it.role, it.content, it.images) }
         _sessions.value = _sessions.value.map {
             if (it.id == sessionId) {
                 val newTitle = if (it.title == "Новый чат") {
@@ -153,7 +155,26 @@ class ChatViewModel : ViewModel() {
         }
         persist()
 
-        val apiMessages = history.map { ChatMessage(it.role, it.content) }
+        startStream(history)
+    }
+
+    /** Перегенерация последнего ответа ассистента. */
+    fun regenerate() {
+        if (_busy.value) return
+        var history = _messages.value
+        if (history.lastOrNull()?.role == "assistant") history = history.dropLast(1)
+        if (history.isEmpty() || history.last().role != "user") return
+        _error.value = null
+        startStream(history)
+    }
+
+    private fun startStream(history: List<UiMessage>) {
+        val s = _settings.value
+        _messages.value = history + UiMessage("assistant", "", isStreaming = true)
+        _busy.value = true
+        _error.value = null
+
+        val apiMessages = history.map { ChatMessage(it.role, it.content, it.images) }
         job = viewModelScope.launch {
             val sb = StringBuilder()
             client.stream(Providers.byId(s.providerId), s.apiKey, s.baseUrl, s.model, apiMessages)
@@ -176,6 +197,19 @@ class ChatViewModel : ViewModel() {
             _busy.value = false
             persistCurrentMessages()
         }
+    }
+
+    /** Переключить активного провайдера (ключ должен быть сохранён в настройках). */
+    fun switchProvider(providerId: String) {
+        if (!::store.isInitialized) return
+        viewModelScope.launch { store.setActiveProvider(providerId) }
+    }
+
+    /** Сменить модель активного провайдера прямо из чата. */
+    fun setModel(model: String) {
+        if (!::store.isInitialized) return
+        val pid = _settings.value.providerId
+        viewModelScope.launch { store.saveModel(pid, model) }
     }
 
     fun stop() {

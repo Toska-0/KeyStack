@@ -1,5 +1,9 @@
 package com.toska.keystack.ui
 
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
@@ -16,6 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,21 +29,31 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,7 +62,9 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
@@ -57,6 +75,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,13 +88,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
+import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.UiMessage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** Файл-вложение: имя + прочитанный текст. */
+data class PendingFile(val name: String, val text: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +118,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -96,12 +127,66 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     var deleteTarget by remember { mutableStateOf<ChatSession?>(null) }
     var renameText by remember { mutableStateOf("") }
 
+    // Вложения
+    var pendingImages by remember { mutableStateOf(listOf<String>()) }
+    var pendingFiles by remember { mutableStateOf(listOf<PendingFile>()) }
+    var attachMenu by remember { mutableStateOf(false) }
+
+    // Переключатель провайдера/модели
+    var showSwitcher by remember { mutableStateOf(false) }
+
+    val photoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(4)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                val imgs = withContext(Dispatchers.IO) {
+                    uris.mapNotNull { uri ->
+                        runCatching {
+                            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                                ?: return@mapNotNull null
+                            if (bytes.size > 8_000_000) return@mapNotNull null
+                            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                            "data:$mime;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        }.getOrNull()
+                    }
+                }
+                pendingImages = (pendingImages + imgs).distinct().take(4)
+            }
+        }
+    }
+
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                val picked = withContext(Dispatchers.IO) {
+                    uris.mapNotNull { uri ->
+                        runCatching {
+                            val name = context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                                val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                if (idx >= 0 && c.moveToFirst()) c.getString(idx) else "файл"
+                            } ?: "файл"
+                            val text = context.contentResolver.openInputStream(uri)?.use { stream ->
+                                stream.readBytes().toString(Charsets.UTF_8).take(100_000)
+                            } ?: return@mapNotNull null
+                            PendingFile(name, text)
+                        }.getOrNull()
+                    }
+                }
+                pendingFiles = (pendingFiles + picked).distinctBy { it.name }
+            }
+        }
+    }
+
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
     val currentSession = sessions.firstOrNull { it.id == currentId }
     val provider = Providers.byId(settings.providerId)
+    val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" && !it.isStreaming }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -156,14 +241,22 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         }
                     },
                     title = {
-                        Column {
+                        // Тап по заголовку — смена провайдера/модели прямо в чате
+                        Column(Modifier.clickable { showSwitcher = true }) {
                             Text(currentSession?.title ?: "KeyStack", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                "${provider.name} • ${settings.model}",
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    provider.name + " • " + settings.model.ifBlank { "модель не выбрана" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = "Сменить провайдера или модель",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     },
                     actions = {
@@ -189,7 +282,14 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(messages) { msg -> MessageBubble(msg) }
+                    itemsIndexed(messages) { idx, msg ->
+                        MessageBubble(
+                            msg = msg,
+                            isLastAssistant = idx == lastAssistantIdx,
+                            busy = busy,
+                            onRegenerate = { vm.regenerate() }
+                        )
+                    }
                 }
 
                 error?.let { err ->
@@ -201,12 +301,69 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     )
                 }
 
+                // Чипы выбранных вложений
+                if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        pendingImages.forEachIndexed { i, _ ->
+                            AssistChip(
+                                onClick = { pendingImages = pendingImages.filterIndexed { idx, _ -> idx != i } },
+                                label = { Text("📷 ${i + 1}") },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp))
+                                }
+                            )
+                        }
+                        pendingFiles.forEach { f ->
+                            AssistChip(
+                                onClick = { pendingFiles = pendingFiles.filter { it.name != f.name } },
+                                label = { Text("📄 " + f.name.take(16)) },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp))
+                                }
+                            )
+                        }
+                    }
+                }
+
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
+                    // Плюс — прикрепить фото или файл
+                    Box {
+                        FilledTonalIconButton(onClick = { attachMenu = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Прикрепить фото или файл")
+                        }
+                        DropdownMenu(
+                            expanded = attachMenu,
+                            onDismissRequest = { attachMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Фото / картинка") },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                onClick = {
+                                    attachMenu = false
+                                    photoPicker.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Файл (текст)") },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = {
+                                    attachMenu = false
+                                    filePicker.launch(arrayOf("*/*"))
+                                }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
                     OutlinedTextField(
                         value = input,
                         onValueChange = { input = it },
@@ -231,14 +388,117 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         }
                     } else {
                         FilledIconButton(
-                            onClick = { vm.send(input); input = "" },
-                            enabled = input.isNotBlank()
+                            onClick = {
+                                val fileBlock = pendingFiles.joinToString("\n\n") { f ->
+                                    "Файл: ${f.name}\n```\n${f.text}\n```"
+                                }
+                                val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
+                                vm.send(fullText, pendingImages)
+                                input = ""
+                                pendingImages = emptyList()
+                                pendingFiles = emptyList()
+                            },
+                            enabled = input.isNotBlank() || pendingImages.isNotEmpty()
                         ) {
                             Icon(Icons.Default.Send, contentDescription = "Отправить")
                         }
                     }
                 }
             }
+        }
+    }
+
+    // Шторка переключения провайдера и модели
+    if (showSwitcher) {
+        val sheetState = rememberModalBottomSheetState()
+        var modelSearch by remember { mutableStateOf("") }
+        var fetchedModels by remember { mutableStateOf<List<String>?>(null) }
+
+        LaunchedEffect(settings.providerId, settings.apiKey, settings.baseUrl) {
+            fetchedModels = null
+            val p = Providers.byId(settings.providerId)
+            fetchedModels = if (settings.apiKey.isNotBlank() &&
+                (p.baseUrl.isNotBlank() || settings.baseUrl.isNotBlank())
+            ) {
+                client.listModels(p, settings.apiKey, settings.baseUrl)
+            } else emptyList()
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { showSwitcher = false },
+            sheetState = sheetState
+        ) {
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+                item {
+                    Text(
+                        "Провайдер",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                items(Providers.all, key = { "p_" + it.id }) { p ->
+                    val hasKey = settings.savedKeys[p.id]?.isNotBlank() == true
+                    ListItem(
+                        headlineContent = { Text(p.name) },
+                        supportingContent = {
+                            Text(if (hasKey) "Ключ сохранён" else "Ключ не добавлен — добавь в настройках")
+                        },
+                        trailingContent = if (p.id == settings.providerId) {
+                            { Icon(Icons.Default.Check, contentDescription = "Активен", tint = MaterialTheme.colorScheme.primary) }
+                        } else null,
+                        modifier = Modifier.clickable { vm.switchProvider(p.id) }
+                    )
+                }
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Модель — " + provider.name, style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = modelSearch,
+                            onValueChange = { modelSearch = it },
+                            label = { Text("Поиск модели") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                when {
+                    fetchedModels == null -> item {
+                        Row(
+                            Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text("Загружаю модели…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    fetchedModels!!.isEmpty() -> item {
+                        Text(
+                            "Список недоступен — выбери модель в настройках",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                    else -> {
+                        val filtered = fetchedModels!!.filter { it.contains(modelSearch.trim(), ignoreCase = true) }
+                        items(filtered, key = { "m_" + it }) { m ->
+                            ListItem(
+                                headlineContent = { Text(m) },
+                                trailingContent = if (m == settings.model) {
+                                    { Icon(Icons.Default.Check, contentDescription = "Выбрана", tint = MaterialTheme.colorScheme.primary) }
+                                } else null,
+                                modifier = Modifier.clickable {
+                                    vm.setModel(m)
+                                    showSwitcher = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
         }
     }
 
@@ -354,11 +614,26 @@ fun ChatListItem(
 }
 
 @Composable
-fun MessageBubble(msg: UiMessage) {
+fun MessageBubble(
+    msg: UiMessage,
+    isLastAssistant: Boolean = false,
+    busy: Boolean = false,
+    onRegenerate: () -> Unit = {}
+) {
     val isUser = msg.role == "user"
-    Row(
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(2000)
+            copied = false
+        }
+    }
+
+    Column(
         Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         Surface(
             color = if (isUser) MaterialTheme.colorScheme.primaryContainer
@@ -368,11 +643,56 @@ fun MessageBubble(msg: UiMessage) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
             } else {
-                SelectionContainer {
-                    Text(
-                        msg.content + if (msg.isStreaming) " ▌" else "",
-                        modifier = Modifier.padding(12.dp).widthIn(max = 320.dp)
+                Column(Modifier.padding(12.dp).widthIn(max = 320.dp)) {
+                    if (isUser && msg.images.isNotEmpty()) {
+                        Text(
+                            "📷 Фото: ${msg.images.size}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    SelectionContainer {
+                        Text(
+                            msg.content + if (msg.isStreaming) " ▌" else ""
+                        )
+                    }
+                }
+            }
+        }
+        // Кнопки под ответом ИИ: копировать и перегенерировать
+        if (!isUser && !msg.isStreaming && msg.content.isNotBlank()) {
+            Row {
+                TextButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(msg.content))
+                        copied = true
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Icon(
+                        if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        contentDescription = "Копировать",
+                        modifier = Modifier.size(16.dp)
                     )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        if (copied) "Скопировано" else "Копировать",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+                if (isLastAssistant && !busy) {
+                    TextButton(
+                        onClick = onRegenerate,
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Перегенерировать",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Заново", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
