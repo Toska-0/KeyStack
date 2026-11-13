@@ -15,7 +15,11 @@ import java.io.File
 data class StoredMessage(
     val role: String,
     val content: String,
-    val images: List<String> = emptyList()
+    val images: List<String> = emptyList(),
+    val id: String = "",
+    val createdAt: Long = 0L,
+    val generationMs: Long = 0L,
+    val tokenEstimate: Int = 0
 )
 
 @Serializable
@@ -27,7 +31,10 @@ data class ChatSession(
     val pinned: Boolean = false,
     val providerId: String = "",
     val model: String = "",
-    val messages: List<StoredMessage> = emptyList()
+    val messages: List<StoredMessage> = emptyList(),
+    val parentSessionId: String? = null,
+    val branchMessageId: String? = null,
+    val pendingPrompt: String? = null
 )
 
 class ChatStore(context: Context) {
