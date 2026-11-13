@@ -270,9 +270,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         }
                     }
                 }
-                SidebarNavItem("▦", "Приложения", "Preview")
-                SidebarNavItem("✣", "Контекст")
-                SidebarNavItem("◷", "Расписание")
                 Text(
                     "ИСТОРИЯ",
                     style = MaterialTheme.typography.labelSmall,
@@ -305,7 +302,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
                     )
                 }
-                LazyColumn {
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                     items(sorted, key = { it.id }) { s ->
                         ChatListItem(
                             session = s,
@@ -415,7 +412,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             if (messages.isEmpty()) {
                     VibeWelcomePanel(
                         providerName = provider.name,
-                        onPrompt = { input = it }
+                        modifier = Modifier.weight(1f).fillMaxWidth()
                     )
                 } else {
                     LazyColumn(
@@ -726,10 +723,10 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 @Composable
 private fun VibeWelcomePanel(
     providerName: String,
-    onPrompt: (String) -> Unit
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 24.dp),
+        modifier = modifier.padding(horizontal = 22.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -764,13 +761,7 @@ private fun VibeWelcomePanel(
                 modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
             )
         }
-        Spacer(Modifier.height(22.dp))
-        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            WelcomeSuggestion("✦", "Настроить и изучить возможности KeyStack", "Расскажи, как эффективнее работать с KeyStack", onPrompt)
-            WelcomeSuggestion("◉", "Узнать о возможностях выбранной модели", "Расскажи о возможностях выбранной модели", onPrompt)
-            WelcomeSuggestion("⌘", "Проанализировать документ или файл", "Помоги проанализировать прикреплённый файл", onPrompt)
-            WelcomeSuggestion("···", "Посмотреть другие возможности", "Какие задачи ты можешь выполнить?", onPrompt)
-        }
+
     }
 }
 
