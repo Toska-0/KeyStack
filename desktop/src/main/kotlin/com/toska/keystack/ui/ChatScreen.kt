@@ -259,7 +259,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             }
         }
         Scaffold(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             topBar = {
                 TopAppBar(
                     colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
