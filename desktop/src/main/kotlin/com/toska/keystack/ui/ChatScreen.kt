@@ -283,7 +283,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         while (true) {
             if (settings.apiKey.isNotBlank()) {
                 quota = client.fetchQuota(Providers.byId(settings.providerId), settings.apiKey)
-                modelContextLimit = client.fetchModelContextLimit(Providers.byId(settings.providerId), settings.model)
+                modelContextLimit = client.fetchModelContextLimit(Providers.byId(settings.providerId), settings.model, settings.apiKey, settings.baseUrl)
                 quotaChecked = true
                 quotaStatus = if (settings.providerId == "openrouter") {
                     if (quota != null) "API подключён" else "Квота OpenRouter недоступна"
