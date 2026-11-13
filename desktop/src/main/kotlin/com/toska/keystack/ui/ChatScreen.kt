@@ -497,13 +497,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(Modifier.height(18.dp))
-                    Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        WelcomeSuggestion("✦", "Настроить и изучить возможности KeyStack", "Расскажи, как эффективнее работать с KeyStack", { input = it })
-                        WelcomeSuggestion("◉", "Узнать о возможностях выбранной модели", "Расскажи о возможностях выбранной модели", { input = it })
-                        WelcomeSuggestion("⌘", "Прикрепить файлы и продолжить работу", "Проанализируй прикреплённый файл и сделай краткое резюме", { input = it })
-                        WelcomeSuggestion("···", "Посмотреть другие возможности", "Какие задачи ты можешь выполнить?", { input = it })
-                    }
+
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
