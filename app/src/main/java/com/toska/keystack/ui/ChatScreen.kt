@@ -476,8 +476,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                                 )
                                 .clickable(enabled = canSend) {
                                     val fileBlock = pendingFiles.joinToString("\n\n") { f ->
-                                        "Файл: ${f.name}\n\`\`\`
-${f.text}\n\`\`\`"
+                                        "Файл: ${f.name}\n```\n${f.text}\n```"
                                     }
                                     val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
                                     vm.send(fullText, pendingImages)
