@@ -382,7 +382,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             },
                             onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
                             onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
-                            onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickTextFiles()).distinctBy { it.name } } },
+                            onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickDocuments()).distinctBy { it.name } } },
                             enabled = input.isNotBlank() || pendingImages.isNotEmpty()
                         )
                     }
@@ -537,22 +537,6 @@ private fun WelcomeSuggestion(symbol: String, title: String, prompt: String, onP
             Text(symbol, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.width(12.dp))
             Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-    }
-}
-
-@Composable
-private fun SidebarNavItem(symbol: String, label: String, tag: String? = null) {
-    Row(
-        Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(symbol, color = Color(0xFFD2D2D7), style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.width(10.dp))
-        Text(label, color = Color(0xFFE4E4E7), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-        if (tag != null) {
-            Text(tag, color = Color(0xFFFFC49B), style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.background(Color(0xFF3A2417), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp))
         }
     }
 }
