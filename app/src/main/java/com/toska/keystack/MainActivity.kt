@@ -21,11 +21,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             KeyStackTheme {
-                val store = remember { SettingsStore(applicationContext) }
+                val settingsStore = remember { SettingsStore(applicationContext) }
+                val chatStore = remember { ChatStore(applicationContext) }
                 val vm: ChatViewModel = viewModel()
                 val scope = rememberCoroutineScope()
 
-                LaunchedEffect(Unit) { vm.load(store) }
+                LaunchedEffect(Unit) { vm.init(settingsStore, chatStore) }
 
                 val settings by vm.settings.collectAsState()
                 var showSetup by remember { mutableStateOf(true) }
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     SetupScreen(
                         initial = settings,
                         onDone = { p, k, m, b ->
-                            scope.launch { store.save(p, k, m, b) }
+                            scope.launch { settingsStore.save(p, k, m, b) }
                             showSetup = false
                         },
                         onBack = if (settings.providerId.isNotBlank() && settings.apiKey.isNotBlank()) {
@@ -52,10 +53,8 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     ChatScreen(
-                        settings = settings,
                         vm = vm,
-                        onOpenSettings = { showSetup = true },
-                        onClear = { vm.clearChat() }
+                        onOpenSettings = { showSetup = true }
                     )
                 }
             }

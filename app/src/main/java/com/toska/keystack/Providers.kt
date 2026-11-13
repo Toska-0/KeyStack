@@ -30,6 +30,11 @@ object Providers {
             "https://aistudio.google.com/apikey"
         ),
         Provider(
+            "kilo", "Kilo Code (Gateway)", "https://ai-gateway.kilo.ai/api/v1", ApiKind.OPENAI,
+            listOf("anthropic/claude-sonnet-4.5", "openai/gpt-4o", "google/gemini-2.5-flash"),
+            "https://kilo.ai"
+        ),
+        Provider(
             "mistral", "Mistral AI", "https://api.mistral.ai/v1", ApiKind.OPENAI,
             listOf("mistral-large-latest", "mistral-small-latest", "magistral-medium-latest", "codestral-latest"),
             "https://console.mistral.ai/api-keys"

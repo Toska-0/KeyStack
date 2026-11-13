@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -30,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +43,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.Settings
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,8 +62,34 @@ fun SetupScreen(
     var showKey by remember { mutableStateOf(false) }
     var dropdown by remember { mutableStateOf(false) }
 
+    var fetchedModels by remember { mutableStateOf<List<String>?>(null) }
+    var loadingModels by remember { mutableStateOf(false) }
+    var fetchFailed by remember { mutableStateOf(false) }
+
     val provider = Providers.byId(selectedId)
     val uriHandler = LocalUriHandler.current
+    val client = remember { LlmClient() }
+    val effectiveUrl = if (provider.needsBaseUrl) baseUrl.trim() else provider.baseUrl
+
+    // Автозагрузка моделей по ключу (с debounce на ввод)
+    LaunchedEffect(selectedId, apiKey, effectiveUrl) {
+        if (apiKey.trim().length >= 8 && effectiveUrl.isNotBlank()) {
+            delay(700)
+            loadingModels = true
+            fetchFailed = false
+            fetchedModels = null
+            val result = client.listModels(provider, apiKey.trim(), effectiveUrl)
+            fetchedModels = result
+            fetchFailed = result.isEmpty()
+            loadingModels = false
+        } else {
+            fetchedModels = null
+            loadingModels = false
+            fetchFailed = false
+        }
+    }
+
+    val options = fetchedModels?.takeIf { it.isNotEmpty() } ?: provider.models
     val valid = apiKey.isNotBlank() && model.isNotBlank() &&
         (!provider.needsBaseUrl || baseUrl.isNotBlank())
 
@@ -157,9 +188,9 @@ fun SetupScreen(
                         .fillMaxWidth()
                         .menuAnchor()
                 )
-                if (provider.models.isNotEmpty()) {
+                if (options.isNotEmpty()) {
                     ExposedDropdownMenu(expanded = dropdown, onDismissRequest = { dropdown = false }) {
-                        provider.models.forEach { m ->
+                        options.forEach { m ->
                             DropdownMenuItem(
                                 text = { Text(m) },
                                 onClick = { model = m; dropdown = false }
@@ -167,6 +198,26 @@ fun SetupScreen(
                         }
                     }
                 }
+            }
+
+            when {
+                loadingModels -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text("Загружаю модели, доступные с этим ключом…", style = MaterialTheme.typography.bodySmall)
+                }
+                fetchedModels != null && fetchedModels!!.isNotEmpty() -> Text(
+                    "Доступно моделей: ${fetchedModels!!.size} — выбери из списка",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                fetchFailed -> Text(
+                    "Не удалось получить список моделей — впиши ID модели вручную",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
 
             Button(

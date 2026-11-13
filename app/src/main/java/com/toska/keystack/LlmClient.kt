@@ -5,6 +5,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -35,6 +36,48 @@ class LlmClient {
         .build()
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    /** Загружает список моделей, доступных с этим ключом. */
+    suspend fun listModels(provider: Provider, apiKey: String, baseUrl: String): List<String> =
+        withContext(Dispatchers.IO) {
+            val effectiveBase = if (baseUrl.isNotBlank()) baseUrl.trimEnd('/') else provider.baseUrl
+            if (effectiveBase.isBlank()) return@withContext emptyList()
+            val request = when (provider.api) {
+                ApiKind.OPENAI -> Request.Builder()
+                    .url("$effectiveBase/models")
+                    .header("Authorization", "Bearer $apiKey")
+                    .get()
+                    .build()
+                ApiKind.ANTHROPIC -> Request.Builder()
+                    .url("$effectiveBase/v1/models")
+                    .header("x-api-key", apiKey)
+                    .header("anthropic-version", "2023-06-01")
+                    .get()
+                    .build()
+                ApiKind.GEMINI -> Request.Builder()
+                    .url("$effectiveBase/v1beta/models?key=$apiKey&pageSize=200")
+                    .get()
+                    .build()
+            }
+            val ids: List<String> = try {
+                client.newCall(request).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use emptyList()
+                    val body = resp.body?.string() ?: return@use emptyList()
+                    val obj = json.parseToJsonElement(body).jsonObject
+                    when (provider.api) {
+                        ApiKind.GEMINI -> obj["models"]?.jsonArray?.mapNotNull { m ->
+                            m.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.removePrefix("models/")
+                        } ?: emptyList()
+                        else -> obj["data"]?.jsonArray?.mapNotNull { m ->
+                            m.jsonObject["id"]?.jsonPrimitive?.contentOrNull
+                        } ?: emptyList()
+                    }
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
+            ids.sorted()
+        }
 
     fun stream(
         provider: Provider,
