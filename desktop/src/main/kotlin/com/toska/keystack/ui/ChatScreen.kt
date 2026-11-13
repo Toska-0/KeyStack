@@ -133,7 +133,7 @@ suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
 suspend fun pickTextFiles(): List<PendingFile> = withContext(Dispatchers.Swing) {
     val chooser = JFileChooser().apply {
         dialogTitle = "Выберите файлы"
-        multiSelectionEnabled = true
+        setMultiSelectionEnabled(true)
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
     withContext(Dispatchers.IO) {
