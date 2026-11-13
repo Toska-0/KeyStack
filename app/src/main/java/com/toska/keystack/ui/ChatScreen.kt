@@ -64,6 +64,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
@@ -116,6 +117,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val messages by vm.messages.collectAsState()
     val busy by vm.busy.collectAsState()
     val error by vm.error.collectAsState()
+    val apiStatus by vm.apiStatus.collectAsState()
     val settings by vm.settings.collectAsState()
     val sessions by vm.sessions.collectAsState()
     val currentId by vm.currentId.collectAsState()
@@ -143,6 +145,22 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 
     // Переключатель провайдера/модели
     var showSwitcher by remember { mutableStateOf(false) }
+    var quota by remember { mutableStateOf<ProviderQuota?>(null) }
+    var quotaStatus by remember { mutableStateOf("Проверка API…") }
+
+    LaunchedEffect(settings.providerId, settings.apiKey) {
+        quota = null
+        quotaStatus = if (settings.apiKey.isBlank()) "API-ключ не настроен" else "Проверка API…"
+        while (true) {
+            if (settings.apiKey.isNotBlank()) {
+                quota = client.fetchQuota(Providers.byId(settings.providerId), settings.apiKey)
+                quotaStatus = if (settings.providerId == "openrouter") {
+                    if (quota != null) "API подключён" else "Квота OpenRouter недоступна"
+                } else apiStatus
+            }
+            delay(60_000)
+        }
+    }
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(4)
@@ -351,6 +369,19 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     .padding(padding)
                     .imePadding()
             ) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).background(if (quota != null || (settings.providerId != "openrouter" && settings.apiKey.isNotBlank())) Color(0xFF45B879) else Color(0xFFB58A45), CircleShape))
+                    Spacer(Modifier.width(7.dp))
+                    Text(if (settings.providerId == "openrouter") quotaStatus else apiStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.weight(1f))
+                    if (settings.providerId == "openrouter" && quota != null) {
+                        val q = quota!!
+                        val fraction = if (q.limit > 0) (q.used / q.limit).toFloat().coerceIn(0f, 1f) else 0f
+                        Text("$" + "%.2f".format(q.remaining) + " осталось из $" + "%.2f".format(q.limit), style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.width(80.dp)) { LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth()) }
+                    } else Text(if (settings.providerId == "openrouter") "Квота недоступна" else "Лимит не раскрывается API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (messages.isNotEmpty()) {
                 OutlinedTextField(
                     value = messageSearch,
