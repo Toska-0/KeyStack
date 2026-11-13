@@ -194,11 +194,7 @@ class ChatViewModel : ViewModel() {
         val apiMessages = history.map { ChatMessage(it.role, it.content, it.images) }
         job = viewModelScope.launch {
             val sb = StringBuilder()
-            val candidates = buildList {
-                add(Triple(Providers.byId(s.providerId), s.apiKey, s.model to s.baseUrl))
-                Providers.all.filter { it.id != s.providerId && !s.savedKeys[it.id].isNullOrBlank() && !s.savedModels[it.id].isNullOrBlank() }
-                    .forEach { p -> add(Triple(p, s.savedKeys[p.id].orEmpty(), s.savedModels[p.id].orEmpty() to s.savedBaseUrls[p.id].orEmpty())) }
-            }
+            val candidates = listOf(Triple(Providers.byId(s.providerId), s.apiKey, s.model to s.baseUrl))
             var succeeded = false
             var lastFailure: String? = null
             for ((index, candidate) in candidates.withIndex()) {
@@ -226,10 +222,6 @@ class ChatViewModel : ViewModel() {
                     succeeded = true
                     _error.value = null
                     _apiStatus.value = "Подключено · ${p.name}"
-                    if (index > 0) {
-                        store.setActiveProvider(p.id)
-                        store.saveModel(p.id, modelId)
-                    }
                     break
                 }
                 lastFailure = failure ?: "Провайдер завершил запрос без ответа"
