@@ -209,6 +209,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val messages by vm.messages.collectAsState()
     val busy by vm.busy.collectAsState()
     val error by vm.error.collectAsState()
+    val apiStatus by vm.apiStatus.collectAsState()
     val settings by vm.settings.collectAsState()
     val sessions by vm.sessions.collectAsState()
     val currentId by vm.currentId.collectAsState()
@@ -394,7 +395,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     CircleShape
                 ))
                 Spacer(Modifier.width(7.dp))
-                Text(quotaStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (settings.providerId == "openrouter") quotaStatus else apiStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.weight(1f))
                 if (settings.providerId == "openrouter" && quota != null) {
                     val q = quota!!
