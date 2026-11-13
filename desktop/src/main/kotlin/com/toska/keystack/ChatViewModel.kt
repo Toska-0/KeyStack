@@ -204,11 +204,7 @@ class ChatViewModel {
                 addAll(history.map { ChatMessage(it.role, it.content, it.images) })
             }
             val sb = StringBuilder()
-            val candidates = buildList {
-                add(Triple(Providers.byId(s.providerId), s.apiKey, Triple(s.model, s.baseUrl, false)))
-                Providers.all.filter { it.id != s.providerId && !s.savedKeys[it.id].isNullOrBlank() && !s.savedModels[it.id].isNullOrBlank() }
-                    .forEach { p -> add(Triple(p, s.savedKeys[p.id].orEmpty(), Triple(s.savedModels[p.id].orEmpty(), s.savedBaseUrls[p.id].orEmpty(), true))) }
-            }
+            val candidates = listOf(Triple(Providers.byId(s.providerId), s.apiKey, Triple(s.model, s.baseUrl, false)))
             var succeeded = false
             var lastFailure: String? = null
             for ((index, candidate) in candidates.withIndex()) {
@@ -217,8 +213,7 @@ class ChatViewModel {
                 val modelInfo = candidate.third
                 val modelId = modelInfo.first
                 val base = modelInfo.second
-                if (index > 0) _apiStatus.value = "Основной провайдер недоступен · пробую ${p.name}"
-                else _apiStatus.value = "Подключение к ${p.name}…"
+                _apiStatus.value = "Подключение к ${p.name}…"
                 val attemptText = StringBuilder()
                 var failure: String? = null
                 client.stream(p, key, base, modelId, apiMessages).collect { ev ->
@@ -238,10 +233,6 @@ class ChatViewModel {
                     succeeded = true
                     _error.value = null
                     _apiStatus.value = "Подключено · ${p.name}"
-                    if (index > 0) {
-                        store.setActiveProvider(p.id)
-                        store.saveModel(p.id, modelId)
-                    }
                     break
                 }
                 lastFailure = failure ?: "Провайдер завершил запрос без ответа"
@@ -265,7 +256,7 @@ class ChatViewModel {
             _messages.value = if (final.isBlank() && _error.value != null) {
                 _messages.value.dropLast(1)
             } else {
-                _messages.value.dropLast(1) + UiMessage("assistant", completedAnswer)
+                _messages.value.dropLast(1) + UiMessage("assistant", completedAnswer, generationMs = elapsed, tokenEstimate = estimateTokens(completedAnswer))
             }
             _busy.value = false
             _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null) else it }
