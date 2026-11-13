@@ -61,16 +61,30 @@ class LlmClient {
             }
         } catch (_: Exception) { null }
     }
-    /** Точная длина контекстного окна модели из публичного каталога OpenRouter. */
-    suspend fun fetchModelContextLimit(provider: Provider, model: String): Int? = withContext(Dispatchers.IO) {
-        if (provider.id != "openrouter" || model.isBlank()) return@withContext null
+    /** Контекстное окно берётся из официального каталога провайдера, если API публикует его. */
+    suspend fun fetchModelContextLimit(provider: Provider, model: String, apiKey: String, baseUrl: String = ""): Int? = withContext(Dispatchers.IO) {
+        if (model.isBlank()) return@withContext null
         try {
-            val request = Request.Builder().url("https://openrouter.ai/api/v1/models").get().build()
+            val base = if (baseUrl.isNotBlank()) baseUrl.trimEnd('/') else provider.baseUrl.trimEnd('/')
+            val request = when (provider.api) {
+                ApiKind.GEMINI -> Request.Builder().url("$base/v1beta/models?key=$apiKey&pageSize=200").get().build()
+                ApiKind.ANTHROPIC -> Request.Builder().url("$base/v1/models").header("x-api-key", apiKey).header("anthropic-version", "2023-06-01").get().build()
+                ApiKind.OPENAI -> if (provider.id == "openrouter") Request.Builder().url("https://openrouter.ai/api/v1/models").get().build() else Request.Builder().url("$base/models").header("Authorization", "Bearer $apiKey").get().build()
+            }
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext null
-                val data = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject["data"]?.jsonArray ?: return@withContext null
-                data.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull == model }
-                    ?.jsonObject?.get("context_length")?.jsonPrimitive?.intOrNull
+                val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
+                val entries = if (provider.api == ApiKind.GEMINI) root["models"]?.jsonArray else root["data"]?.jsonArray
+                val target = entries?.firstOrNull { item ->
+                    val id = item.jsonObject["id"]?.jsonPrimitive?.contentOrNull
+                        ?: item.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.removePrefix("models/")
+                    id == model
+                }?.jsonObject ?: return@withContext null
+                when (provider.api) {
+                    ApiKind.GEMINI -> target["inputTokenLimit"]?.jsonPrimitive?.intOrNull
+                    ApiKind.ANTHROPIC -> target["max_input_tokens"]?.jsonPrimitive?.intOrNull ?: target["context_length"]?.jsonPrimitive?.intOrNull
+                    ApiKind.OPENAI -> target["context_length"]?.jsonPrimitive?.intOrNull ?: target["context_window"]?.jsonPrimitive?.intOrNull ?: target["max_input_tokens"]?.jsonPrimitive?.intOrNull
+                }
             }
         } catch (_: Exception) { null }
     }
