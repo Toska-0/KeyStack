@@ -1,7 +1,9 @@
 package com.toska.keystack.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -46,6 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -130,6 +135,17 @@ fun SetupScreen(
         topBar = {
             TopAppBar(
                 title = { Text("KeyStack — настройка") },
+                navigationIcon = {
+                    Box(
+                        Modifier
+                            .padding(start = 12.dp)
+                            .size(30.dp)
+                            .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
+                    }
+                },
                 actions = {
                     if (onBack != null) {
                         TextButton(onClick = onBack) { Text("В чат") }
@@ -158,6 +174,7 @@ fun SetupScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { selectedId = p.id },
+                    shape = RoundedCornerShape(14.dp),
                     colors = if (p.id == selectedId)
                         CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     else
@@ -224,7 +241,8 @@ fun SetupScreen(
                         search = ""
                         showSheet = true
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -278,7 +296,8 @@ fun SetupScreen(
                     onDone(provider.id, apiKey.trim(), model.trim(), url)
                 },
                 enabled = valid,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(50)
             ) {
                 Text("Сохранить и открыть чат")
             }

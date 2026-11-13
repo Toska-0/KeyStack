@@ -82,7 +82,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -93,6 +95,7 @@ import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.UiMessage
+import com.toska.keystack.ui.theme.MistralGradient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -182,7 +185,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val provider = Providers.byId(settings.providerId)
     val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" && !it.isStreaming }
 
-    Row(Modifier.fillMaxSize().background(Color(0xFF19191B))) {
+    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Постоянная навигационная панель — структура повторяет референс Vibe.
         Column(
             Modifier.width(202.dp).fillMaxHeight()
@@ -193,10 +196,13 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 Modifier.fillMaxWidth().height(48.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(5.dp), modifier = Modifier.size(23.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
-                    }
+                Box(
+                    modifier = Modifier
+                        .size(23.dp)
+                        .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(5.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
                 }
                 Spacer(Modifier.width(9.dp))
                 Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF4F4F5), modifier = Modifier.weight(1f))
@@ -220,13 +226,15 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             }
             Spacer(Modifier.height(9.dp))
             Surface(
-                modifier = Modifier.fillMaxWidth().height(34.dp).clickable { vm.newChat() },
-                color = Color(0xFF29292D), shape = RoundedCornerShape(8.dp)
+                modifier = Modifier.fillMaxWidth().height(34.dp)
+                    .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(8.dp))
+                    .clickable { vm.newChat() },
+                color = Color.Transparent, shape = RoundedCornerShape(8.dp)
             ) {
                 Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("+", color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.width(9.dp))
-                    Text("Новый чат", color = Color(0xFFF1F1F2), style = MaterialTheme.typography.labelLarge)
+                    Text("Новый чат", color = Color.White, style = MaterialTheme.typography.labelLarge)
                 }
             }
             Spacer(Modifier.height(7.dp))
@@ -244,7 +252,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 items(sorted, key = { it.id }) { session ->
                     Row(
                         Modifier.fillMaxWidth()
-                            .background(if (session.id == currentId) Color(0xFF29292D) else Color.Transparent, RoundedCornerShape(7.dp))
+                            .background(if (session.id == currentId) Color(0xFF33261D) else Color.Transparent, RoundedCornerShape(7.dp))
                             .clickable { vm.selectChat(session.id) }
                             .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -273,7 +281,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         }
         // Основная рабочая область без старой верхней панели.
         Column(
-            Modifier.weight(1f).fillMaxHeight().background(Color(0xFF19191B))
+            Modifier.weight(1f).fillMaxHeight().background(MaterialTheme.colorScheme.background)
         ) {
             Row(
                 Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 18.dp),
@@ -281,12 +289,12 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(provider.name + "  ·  " + settings.model.ifBlank { "Модель не выбрана" } + "  ▾",
-                    color = Color(0xFFB8B8BD), style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.clickable { showSwitcher = true })
                 Spacer(Modifier.width(16.dp))
-                Text("⚙", color = Color(0xFFB8B8BD), modifier = Modifier.clickable { onOpenSettings() })
+                Text("⚙", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable { onOpenSettings() })
                 Spacer(Modifier.width(8.dp))
-                Text("⋯", color = Color(0xFFB8B8BD), modifier = Modifier.clickable { vm.clearChat() })
+                Text("⋯", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable { vm.clearChat() })
             }
             if (messages.isEmpty()) {
                 Column(
@@ -294,14 +302,17 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Surface(color = Color.Transparent, modifier = Modifier.size(42.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("K", color = Color(0xFFFF5A1F), style = MaterialTheme.typography.displaySmall)
-                        }
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(15.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("K", color = Color.White, style = MaterialTheme.typography.headlineMedium)
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Добро пожаловать. С чего начнём?",
-                        color = Color(0xFFF4F4F5), style = MaterialTheme.typography.headlineMedium)
+                        color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineMedium)
                     Spacer(Modifier.height(18.dp))
                     ComposerBar(
                         input = input,
@@ -321,14 +332,14 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         enabled = input.isNotBlank() || pendingImages.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
-                        Text("Вложения: ${pendingImages.size + pendingFiles.size}", color = Color(0xFFB8B8BD), style = MaterialTheme.typography.labelSmall)
+                        Text("Вложения: ${pendingImages.size + pendingFiles.size}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                     }
                     Spacer(Modifier.height(18.dp))
-                    Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                        Text("✦   Настроить и изучить возможности KeyStack", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
-                        Text("◉   Узнать о возможностях выбранной модели", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
-                        Text("⌘   Прикрепить файлы и продолжить работу", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
-                        Text("···   Посмотреть другие возможности", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
+                    Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        WelcomeSuggestion("✦", "Настроить и изучить возможности KeyStack", "Расскажи, как эффективнее работать с KeyStack", onPrompt)
+                        WelcomeSuggestion("◉", "Узнать о возможностях выбранной модели", "Расскажи о возможностях выбранной модели", onPrompt)
+                        WelcomeSuggestion("⌘", "Прикрепить файлы и продолжить работу", "Проанализируй прикреплённый файл и сделай краткое резюме", onPrompt)
+                        WelcomeSuggestion("···", "Посмотреть другие возможности", "Какие задачи ты можешь выполнить?", onPrompt)
                     }
                 }
             } else {
@@ -498,6 +509,23 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     }
 }
 
+/** Карточка-подсказка на экране приветствия в стиле Vibe. */
+@Composable
+private fun WelcomeSuggestion(symbol: String, title: String, prompt: String, onPrompt: (String) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable { onPrompt(prompt) },
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(13.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(symbol, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
 @Composable
 private fun SidebarNavItem(symbol: String, label: String, tag: String? = null) {
     Row(
@@ -508,8 +536,8 @@ private fun SidebarNavItem(symbol: String, label: String, tag: String? = null) {
         Spacer(Modifier.width(10.dp))
         Text(label, color = Color(0xFFE4E4E7), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
         if (tag != null) {
-            Text(tag, color = Color(0xFF54B6FF), style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.background(Color(0xFF1B2B39), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp))
+            Text(tag, color = Color(0xFFFFC49B), style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.background(Color(0xFF3A2417), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp))
         }
     }
 }
@@ -530,7 +558,7 @@ private fun ComposerBar(
 ) {
     Row(
         Modifier.widthIn(max = 680.dp).fillMaxWidth()
-            .background(Color(0xFF29292D), RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(26.dp))
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -547,12 +575,13 @@ private fun ComposerBar(
             value = input,
             onValueChange = onInput,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Введите сообщение или / для быстрых команд", color = Color(0xFF929299)) },
+            placeholder = { Text("Введите сообщение или / для быстрых команд", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             maxLines = 5,
             shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                cursorColor = Color(0xFFFF5A1F), focusedBorderColor = Color.Transparent,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                cursorColor = MaterialTheme.colorScheme.primary, focusedBorderColor = Color.Transparent,
                 unfocusedBorderColor = Color.Transparent,
                 focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
             )
@@ -560,8 +589,22 @@ private fun ComposerBar(
         if (busy) {
             FilledIconButton(onClick = onStop) { Icon(Icons.Default.Stop, contentDescription = "Остановить") }
         } else {
-            FilledIconButton(onClick = onSend, enabled = enabled) {
-                Icon(Icons.Default.Send, contentDescription = "Отправить", tint = Color.White)
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(
+                        if (enabled) Brush.linearGradient(MistralGradient) else SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        CircleShape
+                    )
+                    .clickable(enabled = enabled, onClick = onSend),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Send,
+                    contentDescription = "Отправить",
+                    tint = if (enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -743,8 +786,8 @@ fun MessageBubble(
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         Surface(
-            color = if (isUser) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-            shape = RoundedCornerShape(20.dp)
+            color = if (isUser) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+            shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(20.dp)
         ) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
@@ -831,7 +874,7 @@ fun TypingDots() {
                 Modifier
                     .size(8.dp)
                     .graphicsLayer(alpha = alpha)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
             )
         }
     }
