@@ -21,7 +21,8 @@ data class Settings(
     val dynamicColor: Boolean = true,
     val savedKeys: Map<String, String> = emptyMap(),
     val savedModels: Map<String, String> = emptyMap(),
-    val savedBaseUrls: Map<String, String> = emptyMap()
+    val savedBaseUrls: Map<String, String> = emptyMap(),
+    val workspacePath: String = ""
 )
 
 /** Состояние на диске: ключи/модели/baseURL отдельно для каждого провайдера. */
@@ -32,7 +33,8 @@ private data class StoredSettings(
     val dynamicColor: Boolean = true,
     val keys: Map<String, String> = emptyMap(),
     val models: Map<String, String> = emptyMap(),
-    val baseUrls: Map<String, String> = emptyMap()
+    val baseUrls: Map<String, String> = emptyMap(),
+    val workspacePath: String = ""
 )
 
 /** Десктоп-версия: настройки хранятся в settings.json в каталоге данных приложения. */
@@ -60,7 +62,8 @@ class SettingsStore(baseDir: File) {
             dynamicColor = s.dynamicColor,
             savedKeys = s.keys,
             savedModels = s.models,
-            savedBaseUrls = s.baseUrls
+            savedBaseUrls = s.baseUrls,
+            workspacePath = s.workspacePath
         )
     }
 
@@ -102,5 +105,9 @@ class SettingsStore(baseDir: File) {
 
     suspend fun saveTheme(themeMode: String, dynamicColor: Boolean) {
         update { it.copy(themeMode = themeMode, dynamicColor = dynamicColor) }
+    }
+
+    suspend fun saveWorkspace(path: String) {
+        update { it.copy(workspacePath = path) }
     }
 }
