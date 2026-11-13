@@ -77,6 +77,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -85,6 +86,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.awt.LocalWindow
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -108,11 +116,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 import java.util.Base64
+import java.awt.Image
+import java.awt.Toolkit
+import java.awt.datatransfer.DataFlavor
+import java.awt.dnd.DnDConstants
+import java.awt.dnd.DropTarget
+import java.awt.dnd.DropTargetAdapter
+import java.awt.dnd.DropTargetDropEvent
+import java.awt.image.BufferedImage
+import java.io.File
+import javax.imageio.ImageIO
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 
 /** Файл-вложение: имя + прочитанный текст. */
-data class PendingFile(val name: String, val text: String)
+data class PendingFile(val name: String, val text: String, val path: String = "")
 
 /** Диалог выбора картинок: возвращает data URI вида "data:image/jpeg;base64,...". */
 suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
@@ -154,12 +172,37 @@ suspend fun pickDocuments(): List<PendingFile> = withContext(Dispatchers.Swing) 
         (chooser.selectedFiles.toList().ifEmpty { listOfNotNull(chooser.selectedFile) }).mapNotNull { file ->
             runCatching {
                 require(file.isFile && file.length() <= 2_000_000L)
-                PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000))
+                PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000), file.absolutePath)
             }.getOrNull()
         }
     }
 }
 
+private fun clipboardImageDataUri(): String? = runCatching {
+    val image = Toolkit.getDefaultToolkit().systemClipboard.getData(DataFlavor.imageFlavor) as? Image ?: return null
+    val w = image.getWidth(null).coerceAtLeast(1); val h = image.getHeight(null).coerceAtLeast(1)
+    val buffered = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+    val graphics = buffered.createGraphics(); graphics.drawImage(image, 0, 0, null); graphics.dispose()
+    val output = java.io.ByteArrayOutputStream(); ImageIO.write(buffered, "png", output)
+    "data:image/png;base64," + Base64.getEncoder().encodeToString(output.toByteArray())
+}.getOrNull()
+
+private suspend fun readDroppedFiles(files: List<File>): Pair<List<String>, List<PendingFile>> = withContext(Dispatchers.IO) {
+    val images = mutableListOf<String>(); val docs = mutableListOf<PendingFile>()
+    files.filter { it.isFile }.take(12).forEach { file -> runCatching {
+        when (file.extension.lowercase()) {
+            "png", "jpg", "jpeg", "webp", "gif", "bmp" -> {
+                val bytes = file.readBytes()
+                if (bytes.size <= 8_000_000) {
+                    val mime = when (file.extension.lowercase()) { "png" -> "image/png"; "webp" -> "image/webp"; "gif" -> "image/gif"; "bmp" -> "image/bmp"; else -> "image/jpeg" }
+                    images += "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes)
+                }
+            }
+            else -> if (file.length() <= 2_000_000L) docs += PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000), file.absolutePath)
+        }
+    } }
+    images to docs
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
@@ -187,6 +230,39 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     var pendingImages by remember { mutableStateOf(listOf<String>()) }
     var pendingFiles by remember { mutableStateOf(listOf<PendingFile>()) }
     var attachMenu by remember { mutableStateOf(false) }
+    var loadingAttachments by remember { mutableStateOf(false) }
+    var recentAttachmentPaths by remember { mutableStateOf(emptyList<String>()) }
+    val awtWindow = LocalWindow.current
+    fun saveRecentAttachmentPaths(paths: List<String>) {
+        recentAttachmentPaths = (paths + recentAttachmentPaths).filter { it.isNotBlank() }.distinct().take(12)
+        runCatching { val history = File(System.getProperty("user.home"), ".keystack/attachment-history.txt"); history.parentFile?.mkdirs(); history.writeText(recentAttachmentPaths.joinToString("\n")) }
+    }
+    LaunchedEffect(Unit) {
+        val history = File(System.getProperty("user.home"), ".keystack/attachment-history.txt")
+        recentAttachmentPaths = runCatching { if (history.exists()) history.readLines().filter { File(it).exists() }.take(12) else emptyList() }.getOrDefault(emptyList())
+    }
+    DisposableEffect(awtWindow) {
+        val previousTarget = awtWindow.dropTarget
+        awtWindow.dropTarget = DropTarget(awtWindow, DnDConstants.ACTION_COPY, object : DropTargetAdapter() {
+            override fun drop(event: DropTargetDropEvent) {
+                try {
+                    event.acceptDrop(DnDConstants.ACTION_COPY)
+                    @Suppress("UNCHECKED_CAST")
+                    val files = event.transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<File>
+                    scope.launch {
+                        loadingAttachments = true
+                        val batch = readDroppedFiles(files)
+                        pendingImages = (pendingImages + batch.first).distinct().take(4)
+                        pendingFiles = (pendingFiles + batch.second).distinctBy { it.path.ifBlank { it.name } }
+                        saveRecentAttachmentPaths(files.map { it.absolutePath })
+                        loadingAttachments = false
+                    }
+                    event.dropComplete(true)
+                } catch (_: Exception) { event.dropComplete(false) }
+            }
+        }, true)
+        onDispose { awtWindow.dropTarget = previousTarget }
+    }
 
     // Переключатель провайдера/модели
     var showSwitcher by remember { mutableStateOf(false) }
@@ -384,8 +460,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         onAttach = { attachMenu = true },
                         attachMenu = attachMenu,
                         onDismissAttach = { attachMenu = false },
-                        onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
-                        onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickDocuments()).distinctBy { it.name } } },
+                        onPickImages = { scope.launch { loadingAttachments = true; pendingImages = (pendingImages + pickImages()).distinct().take(4); loadingAttachments = false } },
+                        onPickFiles = { scope.launch { loadingAttachments = true; val picked = pickDocuments(); pendingFiles = (pendingFiles + picked).distinctBy { it.path.ifBlank { it.name } }; saveRecentAttachmentPaths(picked.map { it.path }); loadingAttachments = false } },
                         enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty() || pendingFiles.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
@@ -458,7 +534,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             },
                             onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
                             onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
-                            onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickDocuments()).distinctBy { it.name } } },
+                            onPickFiles = { scope.launch { loadingAttachments = true; val picked = pickDocuments(); pendingFiles = (pendingFiles + picked).distinctBy { it.path.ifBlank { it.name } }; saveRecentAttachmentPaths(picked.map { it.path }); loadingAttachments = false } },
                             enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
                         )
                     }
@@ -652,7 +728,8 @@ private fun ComposerBar(
     onDismissAttach: () -> Unit,
     onPickImages: () -> Unit,
     onPickFiles: () -> Unit,
-    enabled: Boolean
+    enabled: Boolean,
+    onPasteImageValue: (String) -> Unit = {}
 ) {
     Row(
         Modifier.widthIn(max = 760.dp).fillMaxWidth()
@@ -673,7 +750,9 @@ private fun ComposerBar(
         OutlinedTextField(
             value = input,
             onValueChange = onInput,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.isCtrlPressed && event.key == Key.V) { clipboardImageDataUri()?.let { onPasteImageValue(it) }; false } else false
+            },
             placeholder = { Text("Введите сообщение или / для быстрых команд", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
             textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
             maxLines = 5,
