@@ -22,7 +22,10 @@ data class Settings(
     val savedKeys: Map<String, String> = emptyMap(),
     val savedModels: Map<String, String> = emptyMap(),
     val savedBaseUrls: Map<String, String> = emptyMap(),
-    val workspacePath: String = ""
+    val workspacePath: String = "",
+    val fontScale: Float = 1f,
+    val messageWidth: Int = 760,
+    val animationsEnabled: Boolean = true
 )
 
 /** Состояние на диске: ключи/модели/baseURL отдельно для каждого провайдера. */
@@ -34,7 +37,10 @@ private data class StoredSettings(
     val keys: Map<String, String> = emptyMap(),
     val models: Map<String, String> = emptyMap(),
     val baseUrls: Map<String, String> = emptyMap(),
-    val workspacePath: String = ""
+    val workspacePath: String = "",
+    val fontScale: Float = 1f,
+    val messageWidth: Int = 760,
+    val animationsEnabled: Boolean = true
 )
 
 /** Десктоп-версия: настройки хранятся в settings.json в каталоге данных приложения. */
@@ -63,7 +69,10 @@ class SettingsStore(baseDir: File) {
             savedKeys = s.keys,
             savedModels = s.models,
             savedBaseUrls = s.baseUrls,
-            workspacePath = s.workspacePath
+            workspacePath = s.workspacePath,
+            fontScale = s.fontScale,
+            messageWidth = s.messageWidth,
+            animationsEnabled = s.animationsEnabled
         )
     }
 
@@ -109,5 +118,15 @@ class SettingsStore(baseDir: File) {
 
     suspend fun saveWorkspace(path: String) {
         update { it.copy(workspacePath = path) }
+    }
+
+    suspend fun saveUiPreferences(fontScale: Float, messageWidth: Int, animationsEnabled: Boolean) {
+        update {
+            it.copy(
+                fontScale = fontScale.coerceIn(0.85f, 1.4f),
+                messageWidth = messageWidth.coerceIn(560, 1100),
+                animationsEnabled = animationsEnabled
+            )
+        }
     }
 }
