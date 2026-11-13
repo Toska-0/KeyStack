@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -158,6 +159,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
     var chatSearch by remember { mutableStateOf("") }
+    var workspaceMode by remember { mutableStateOf("Работа") }
     val listState = rememberLazyListState()
 
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
@@ -307,8 +309,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         busy = busy,
                         onStop = { vm.stop() },
                         onSend = {
-                            val fileBlock = pendingFiles.joinToString("\\n\\n") { f -> "Файл: ${f.name}\\n```\\n${f.text}\\n```" }
-                            val fullText = if (fileBlock.isBlank()) input else (input + "\\n\\n" + fileBlock).trim()
+                            val fileBlock = pendingFiles.joinToString("\n\n") { f -> "Файл: ${f.name}\n```\n${f.text}\n```" }
+                            val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
                             vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
                         },
                         onAttach = { attachMenu = true },
@@ -349,8 +351,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     ComposerBar(
                         input = input, onInput = { input = it }, busy = busy, onStop = { vm.stop() },
                         onSend = {
-                            val fileBlock = pendingFiles.joinToString("\\n\\n") { f -> "Файл: ${f.name}\\n```\\n${f.text}\\n```" }
-                            val fullText = if (fileBlock.isBlank()) input else (input + "\\n\\n" + fileBlock).trim()
+                            val fileBlock = pendingFiles.joinToString("\n\n") { f -> "Файл: ${f.name}\n```\n${f.text}\n```" }
+                            val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
                             vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
                         },
                         onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
@@ -493,6 +495,75 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 TextButton(onClick = { deleteTarget = null }) { Text("Отмена") }
             }
         )
+    }
+}
+
+@Composable
+private fun SidebarNavItem(symbol: String, label: String, tag: String? = null) {
+    Row(
+        Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(symbol, color = Color(0xFFD2D2D7), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.width(10.dp))
+        Text(label, color = Color(0xFFE4E4E7), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+        if (tag != null) {
+            Text(tag, color = Color(0xFF54B6FF), style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.background(Color(0xFF1B2B39), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp))
+        }
+    }
+}
+
+@Composable
+private fun ComposerBar(
+    input: String,
+    onInput: (String) -> Unit,
+    busy: Boolean,
+    onStop: () -> Unit,
+    onSend: () -> Unit,
+    onAttach: () -> Unit,
+    attachMenu: Boolean,
+    onDismissAttach: () -> Unit,
+    onPickImages: () -> Unit,
+    onPickFiles: () -> Unit,
+    enabled: Boolean
+) {
+    Row(
+        Modifier.widthIn(max = 680.dp).fillMaxWidth()
+            .background(Color(0xFF29292D), RoundedCornerShape(14.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box {
+            IconButton(onClick = onAttach, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.Default.Add, contentDescription = "Добавить вложение", tint = Color(0xFFE6E6E8))
+            }
+            DropdownMenu(expanded = attachMenu, onDismissRequest = onDismissAttach) {
+                DropdownMenuItem(text = { Text("Фото / картинка") }, onClick = { onDismissAttach(); onPickImages() })
+                DropdownMenuItem(text = { Text("Файл (текст)") }, onClick = { onDismissAttach(); onPickFiles() })
+            }
+        }
+        OutlinedTextField(
+            value = input,
+            onValueChange = onInput,
+            modifier = Modifier.weight(1f),
+            placeholder = { Text("Введите сообщение или / для быстрых команд", color = Color(0xFF929299)) },
+            maxLines = 5,
+            shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                cursorColor = Color(0xFFFF5A1F), focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
+            )
+        )
+        if (busy) {
+            FilledIconButton(onClick = onStop) { Icon(Icons.Default.Stop, contentDescription = "Остановить") }
+        } else {
+            FilledIconButton(onClick = onSend, enabled = enabled) {
+                Icon(Icons.Default.Send, contentDescription = "Отправить", tint = Color.White)
+            }
+        }
     }
 }
 
