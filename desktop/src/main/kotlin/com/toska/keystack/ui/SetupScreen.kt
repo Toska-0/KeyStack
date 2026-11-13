@@ -36,6 +36,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -69,6 +71,7 @@ fun SetupScreen(
     onDone: (providerId: String, apiKey: String, model: String, baseUrl: String) -> Unit,
     onSaveTheme: (themeMode: String, dynamicColor: Boolean) -> Unit,
     onSaveWorkspace: (path: String) -> Unit,
+    onSaveUiPreferences: (fontScale: Float, messageWidth: Int, animationsEnabled: Boolean) -> Unit,
     onBack: (() -> Unit)? = null
 ) {
     var selectedId by remember { mutableStateOf(initial.providerId.ifBlank { Providers.all.first().id }) }
@@ -81,6 +84,9 @@ fun SetupScreen(
 
     var themeMode by remember { mutableStateOf(initial.themeMode) }
     var workspacePath by remember { mutableStateOf(initial.workspacePath) }
+    var fontScale by remember { mutableStateOf(initial.fontScale) }
+    var messageWidth by remember { mutableStateOf(initial.messageWidth.toFloat()) }
+    var animationsEnabled by remember { mutableStateOf(initial.animationsEnabled) }
 
     // Черновики полей по провайдерам — чтобы ввод не терялся при переключении
     val draftKeys = remember { mutableStateMapOf<String, String>() }
@@ -330,6 +336,25 @@ fun SetupScreen(
                     )
                     Text(label, style = MaterialTheme.typography.bodyLarge)
                 }
+            }
+
+            Text("Интерфейс чата", style = MaterialTheme.typography.titleMedium)
+            Text("Размер текста: ${(fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+            Slider(value = fontScale, onValueChange = {
+                fontScale = it
+                onSaveUiPreferences(it, messageWidth.toInt(), animationsEnabled)
+            }, valueRange = 0.85f..1.4f)
+            Text("Ширина сообщений: ${messageWidth.toInt()} dp", style = MaterialTheme.typography.bodyMedium)
+            Slider(value = messageWidth, onValueChange = {
+                messageWidth = it
+                onSaveUiPreferences(fontScale, it.toInt(), animationsEnabled)
+            }, valueRange = 560f..1100f)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Анимации интерфейса", modifier = Modifier.weight(1f))
+                Switch(checked = animationsEnabled, onCheckedChange = {
+                    animationsEnabled = it
+                    onSaveUiPreferences(fontScale, messageWidth.toInt(), it)
+                })
             }
 
             Text("Рабочая папка ИИ", style = MaterialTheme.typography.titleMedium)
