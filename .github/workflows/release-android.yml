@@ -1,0 +1,68 @@
+name: Release KeyStack 0.1.0 — Android
+
+on:
+  push:
+    branches:
+      - release/0.1.0-android
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore release signing key
+        uses: actions/cache@v4
+        with:
+          path: debug.keystore
+          key: keystack-keystore-v1
+
+      - name: Generate signing key if needed
+        shell: bash
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -alias keystack \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=KeyStack, OU=KeyStack, O=KeyStack, C=RU"
+          fi
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build universal release APK
+        run: gradle assembleRelease --no-daemon
+
+      - name: Publish Android release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-android
+          target_commitish: main
+          name: KeyStack 0.1.0 — Android
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## KeyStack 0.1.0 — Android
+
+            Первая публичная сборка KeyStack для Android.
+
+            **Файл:** универсальный APK для Android-смартфонов.
+            **Установка:** скачайте APK на телефон, откройте его и подтвердите установку. Если Android запросит разрешение на установку из этого источника, разрешите его для приложения, которым открыт файл.
+
+            Для работы с нейросетями потребуется собственный API-ключ выбранного провайдера.
+          files: app/build/outputs/apk/release/app-release.apk
