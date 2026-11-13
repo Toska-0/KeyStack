@@ -1,5 +1,7 @@
 package com.toska.keystack.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
@@ -90,6 +92,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
@@ -359,18 +362,23 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         Text("Ошибка: $err", color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
                     }
-                    ComposerBar(
-                        input = input, onInput = { input = it }, busy = busy, onStop = { vm.stop() },
-                        onSend = {
-                            val fileBlock = pendingFiles.joinToString("\n\n") { f -> "Файл: ${f.name}\n```\n${f.text}\n```" }
-                            val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
-                            vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
-                        },
-                        onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
-                        onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
-                        onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickTextFiles()).distinctBy { it.name } } },
-                        enabled = input.isNotBlank() || pendingImages.isNotEmpty()
-                    )
+                    Box(
+                        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ComposerBar(
+                            input = input, onInput = { input = it }, busy = busy, onStop = { vm.stop() },
+                            onSend = {
+                                val fileBlock = pendingFiles.joinToString("\n\n") { f -> "Файл: ${f.name}\n```\n${f.text}\n```" }
+                                val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
+                                vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
+                            },
+                            onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
+                            onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
+                            onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickTextFiles()).distinctBy { it.name } } },
+                            enabled = input.isNotBlank() || pendingImages.isNotEmpty()
+                        )
+                    }
                 }
             }
         }
@@ -557,9 +565,10 @@ private fun ComposerBar(
     enabled: Boolean
 ) {
     Row(
-        Modifier.widthIn(max = 680.dp).fillMaxWidth()
+        Modifier.widthIn(max = 760.dp).fillMaxWidth()
+            .animateContentSize(tween(180))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(26.dp))
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box {
@@ -575,7 +584,8 @@ private fun ComposerBar(
             value = input,
             onValueChange = onInput,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Введите сообщение или / для быстрых команд", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            placeholder = { Text("Введите сообщение или / для быстрых команд", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
             maxLines = 5,
             shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -773,6 +783,13 @@ fun MessageBubble(
     val isUser = msg.role == "user"
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val enterProgress by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "message-enter"
+    )
 
     LaunchedEffect(copied) {
         if (copied) {
@@ -782,17 +799,22 @@ fun MessageBubble(
     }
 
     Column(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().graphicsLayer {
+            alpha = enterProgress
+            translationY = (1f - enterProgress) * 12f
+        },
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         Surface(
-            color = if (isUser) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-            shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(20.dp)
+            modifier = Modifier.animateContentSize(tween(180)),
+            color = if (isUser) Color(0xFF39251F) else Color(0xFF202024),
+            shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(18.dp),
+            border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF34343A))
         ) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
             } else {
-                Column(Modifier.padding(12.dp).widthIn(max = 480.dp)) {
+                Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp).widthIn(max = 760.dp)) {
                     if (isUser && msg.images.isNotEmpty()) {
                         Text(
                             "📷 Фото: ${msg.images.size}",
@@ -802,7 +824,9 @@ fun MessageBubble(
                     }
                     SelectionContainer {
                         Text(
-                            msg.content + if (msg.isStreaming) " ▌" else ""
+                            msg.content + if (msg.isStreaming) " ▌" else "",
+                            color = if (isUser) Color(0xFFFFE4D8) else Color(0xFFE8E8EC),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp)
                         )
                     }
                 }
