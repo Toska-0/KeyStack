@@ -180,271 +180,188 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val provider = Providers.byId(settings.providerId)
     val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" && !it.isStreaming }
 
-    Row(Modifier.fillMaxSize()) {
-        ModalDrawerSheet(
-            modifier = Modifier.width(264.dp),
-            drawerContainerColor = MaterialTheme.colorScheme.surface,
-            drawerContentColor = MaterialTheme.colorScheme.onSurface
+    Row(Modifier.fillMaxSize().background(Color(0xFF19191B))) {
+        // Постоянная навигационная панель — структура повторяет референс Vibe.
+        Column(
+            Modifier.width(202.dp).fillMaxHeight()
+                .background(Color(0xFF151517))
+                .padding(horizontal = 12.dp)
         ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(7.dp), modifier = Modifier.size(28.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("K", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                            }
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text("KeyStack", style = MaterialTheme.typography.titleMedium)
-                            Text("AI workspace", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    FilledTonalIconButton(onClick = {
-                        vm.newChat()
-                        scope.launch { drawerState.close() }
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Новый чат")
-                    }
-                }
-                Text(
-                    "ИСТОРИЯ",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 18.dp, top = 20.dp, bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = chatSearch,
-                    onValueChange = { chatSearch = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                    singleLine = true,
-                    placeholder = { Text("Найти диалог") },
-                    shape = RoundedCornerShape(13.dp),
-                    leadingIcon = { Text("⌕", style = MaterialTheme.typography.titleLarge) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                )
-                val sorted = sessions.sortedWith(
-                    compareByDescending<ChatSession> { it.pinned }.thenByDescending { it.updatedAt }
-                ).filter { it.title.contains(chatSearch, ignoreCase = true) }
-                if (sorted.isEmpty()) {
-                    Text(
-                        if (chatSearch.isBlank()) "Здесь появятся ваши диалоги" else "Ничего не найдено",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
-                    )
-                }
-                LazyColumn {
-                    items(sorted, key = { it.id }) { s ->
-                        ChatListItem(
-                            session = s,
-                            selected = s.id == currentId,
-                            onClick = {
-                                vm.selectChat(s.id)
-                                scope.launch { drawerState.close() }
-                            },
-                            onRename = { renameText = s.title; renameTarget = s },
-                            onPin = { vm.togglePin(s.id) },
-                            onDelete = { deleteTarget = s }
-                        )
-                    }
-                }
-            }
-        }
-        Scaffold(
-            modifier = Modifier.fillMaxWidth(),
-            topBar = {
-                TopAppBar(
-                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    ),
-                    navigationIcon = {
-                        Spacer(Modifier.width(12.dp))
-                    },
-                    title = {
-                        // Тап по заголовку — смена провайдера/модели прямо в чате
-                        Column(Modifier.clickable { showSwitcher = true }) {
-                            Text(currentSession?.title ?: "Новая задача", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    provider.name + "  /  " + settings.model.ifBlank { "Модель не выбрана" },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    contentDescription = "Сменить провайдера или модель",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { vm.clearChat() }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Очистить чат")
-                        }
-                        IconButton(onClick = onOpenSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Настройки")
-                        }
-                    }
-                )
-            }
-        ) { padding ->
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(padding)
+            Row(
+                Modifier.fillMaxWidth().height(48.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (messages.isEmpty()) {
-                    VibeWelcomePanel(
-                        providerName = provider.name,
-                        onPrompt = { input = it }
-                    )
-                } else {
-                    LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
-                ) {
-                    itemsIndexed(messages) { idx, msg ->
-                        MessageBubble(
-                            msg = msg,
-                            isLastAssistant = idx == lastAssistantIdx,
-                            busy = busy,
-                            onRegenerate = { vm.regenerate() }
-                        )
-                    }
+                Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(5.dp), modifier = Modifier.size(23.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
                     }
                 }
-
-                error?.let { err ->
-                    Text(
-                        "Ошибка: $err",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
-                }
-
-                // Чипы выбранных вложений
-                if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Spacer(Modifier.width(9.dp))
+                Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF4F4F5), modifier = Modifier.weight(1f))
+                Text("⌕", color = Color(0xFFB8B8BD), modifier = Modifier.clickable { chatSearch = if (chatSearch.isBlank()) " " else "" }.padding(horizontal = 5.dp))
+                Text("◫", color = Color(0xFFB8B8BD), modifier = Modifier.padding(start = 5.dp))
+            }
+            Row(
+                Modifier.fillMaxWidth().background(Color(0xFF0D0D0F), RoundedCornerShape(8.dp)).padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                listOf("Работа", "Код").forEach { mode ->
+                    Surface(
+                        modifier = Modifier.weight(1f).clickable { workspaceMode = mode },
+                        color = if (workspaceMode == mode) Color(0xFF29292D) else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp)
                     ) {
-                        pendingImages.forEachIndexed { i, _ ->
-                            AssistChip(
-                                onClick = { pendingImages = pendingImages.filterIndexed { idx, _ -> idx != i } },
-                                label = { Text("📷 ${i + 1}") },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp))
-                                }
-                            )
-                        }
-                        pendingFiles.forEach { f ->
-                            AssistChip(
-                                onClick = { pendingFiles = pendingFiles.filter { it.name != f.name } },
-                                label = { Text("📄 " + f.name.take(16)) },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp))
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                         .padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    // Плюс — прикрепить фото или файл
-                    Box {
-                        FilledTonalIconButton(onClick = { attachMenu = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "Прикрепить фото или файл")
-                        }
-                        DropdownMenu(
-                            expanded = attachMenu,
-                            onDismissRequest = { attachMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Фото / картинка") },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                                onClick = {
-                                    attachMenu = false
-                                    scope.launch {
-                                        val imgs = pickImages()
-                                        pendingImages = (pendingImages + imgs).distinct().take(4)
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Файл (текст)") },
-                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
-                                onClick = {
-                                    attachMenu = false
-                                    scope.launch {
-                                        val picked = pickTextFiles()
-                                        pendingFiles = (pendingFiles + picked).distinctBy { it.name }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = { input = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("Спросите что-нибудь…") },
-                        maxLines = 5,
-                        shape = RoundedCornerShape(26.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    if (busy) {
-                        FilledIconButton(onClick = { vm.stop() }) {
-                            Icon(Icons.Default.Stop, contentDescription = "Стоп")
-                        }
-                    } else {
-                        FilledIconButton(
-                            onClick = {
-                                val fileBlock = pendingFiles.joinToString("\n\n") { f ->
-                                    "Файл: ${f.name}\n```\n${f.text}\n```"
-                                }
-                                val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
-                                vm.send(fullText, pendingImages)
-                                input = ""
-                                pendingImages = emptyList()
-                                pendingFiles = emptyList()
-                            },
-                            enabled = input.isNotBlank() || pendingImages.isNotEmpty()
-                        ) {
-                            Icon(Icons.Default.Send, contentDescription = "Отправить", tint = Color.White)
-                        }
+                        Text(mode, modifier = Modifier.padding(vertical = 7.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            style = MaterialTheme.typography.labelLarge, color = if (workspaceMode == mode) Color.White else Color(0xFFB9B9BE))
                     }
                 }
             }
+            Spacer(Modifier.height(9.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth().height(34.dp).clickable { vm.newChat() },
+                color = Color(0xFF29292D), shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("+", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.width(9.dp))
+                    Text("Новый чат", color = Color(0xFFF1F1F2), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            Spacer(Modifier.height(7.dp))
+            SidebarNavItem("▦", "Приложения", "Preview")
+            SidebarNavItem("✣", "Контекст")
+            SidebarNavItem("◷", "Расписание")
+            Spacer(Modifier.height(20.dp))
+            Text("Проекты", color = Color(0xFF9A9AA1), style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 8.dp, bottom = 9.dp))
+            Text("Недавние", color = Color(0xFF9A9AA1), style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 8.dp, bottom = 7.dp))
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                val sorted = sessions.sortedWith(compareByDescending<ChatSession> { it.pinned }.thenByDescending { it.updatedAt })
+                    .filter { it.title.contains(chatSearch.trim(), ignoreCase = true) }
+                items(sorted, key = { it.id }) { session ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(if (session.id == currentId) Color(0xFF29292D) else Color.Transparent, RoundedCornerShape(7.dp))
+                            .clickable { vm.selectChat(session.id) }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(session.title, color = Color(0xFFE3E3E6), style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onOpenSettings() },
+                color = Color(0xFF202023), shape = RoundedCornerShape(9.dp)
+            ) {
+                Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(color = Color(0xFF39393F), shape = CircleShape, modifier = Modifier.size(27.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Text("K", color = Color.White, style = MaterialTheme.typography.labelSmall) }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("KeyStack", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                        Text(provider.name, color = Color(0xFF9B9BA2), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    }
+                    Text("⚙", color = Color(0xFFB8B8BD))
+                }
+            }
         }
+        // Основная рабочая область без старой верхней панели.
+        Column(
+            Modifier.fillMaxSize().background(Color(0xFF19191B))
+        ) {
+            Row(
+                Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(provider.name + "  ·  " + settings.model.ifBlank { "Модель не выбрана" } + "  ▾",
+                    color = Color(0xFFB8B8BD), style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.clickable { showSwitcher = true })
+                Spacer(Modifier.width(16.dp))
+                Text("⚙", color = Color(0xFFB8B8BD), modifier = Modifier.clickable { onOpenSettings() })
+                Spacer(Modifier.width(8.dp))
+                Text("⋯", color = Color(0xFFB8B8BD), modifier = Modifier.clickable { vm.clearChat() })
+            }
+            if (messages.isEmpty()) {
+                Column(
+                    Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Surface(color = Color.Transparent, modifier = Modifier.size(42.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("K", color = Color(0xFFFF5A1F), style = MaterialTheme.typography.displaySmall)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("Добро пожаловать. С чего начнём?",
+                        color = Color(0xFFF4F4F5), style = MaterialTheme.typography.headlineMedium)
+                    Spacer(Modifier.height(18.dp))
+                    ComposerBar(
+                        input = input,
+                        onInput = { input = it },
+                        busy = busy,
+                        onStop = { vm.stop() },
+                        onSend = {
+                            val fileBlock = pendingFiles.joinToString("\\n\\n") { f -> "Файл: ${f.name}\\n```\\n${f.text}\\n```" }
+                            val fullText = if (fileBlock.isBlank()) input else (input + "\\n\\n" + fileBlock).trim()
+                            vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
+                        },
+                        onAttach = { attachMenu = true },
+                        attachMenu = attachMenu,
+                        onDismissAttach = { attachMenu = false },
+                        onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
+                        onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickTextFiles()).distinctBy { it.name } } },
+                        enabled = input.isNotBlank() || pendingImages.isNotEmpty()
+                    )
+                    if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
+                        Text("Вложения: ${pendingImages.size + pendingFiles.size}", color = Color(0xFFB8B8BD), style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                        Text("✦   Настроить и изучить возможности KeyStack", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
+                        Text("◉   Узнать о возможностях выбранной модели", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
+                        Text("⌘   Прикрепить файлы и продолжить работу", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
+                        Text("···   Посмотреть другие возможности", color = Color(0xFFBFC0C5), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize().imePadding()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        itemsIndexed(messages) { idx, msg ->
+                            MessageBubble(msg = msg, isLastAssistant = idx == lastAssistantIdx, busy = busy,
+                                onRegenerate = { vm.regenerate() })
+                        }
+                    }
+                    error?.let { err ->
+                        Text("Ошибка: $err", color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                    }
+                    ComposerBar(
+                        input = input, onInput = { input = it }, busy = busy, onStop = { vm.stop() },
+                        onSend = {
+                            val fileBlock = pendingFiles.joinToString("\\n\\n") { f -> "Файл: ${f.name}\\n```\\n${f.text}\\n```" }
+                            val fullText = if (fileBlock.isBlank()) input else (input + "\\n\\n" + fileBlock).trim()
+                            vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
+                        },
+                        onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
+                        onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
+                        onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickTextFiles()).distinctBy { it.name } } },
+                        enabled = input.isNotBlank() || pendingImages.isNotEmpty()
+                    )
+                }
+            }
+        }
+    }
 
     // Шторка переключения провайдера и модели
     if (showSwitcher) {
