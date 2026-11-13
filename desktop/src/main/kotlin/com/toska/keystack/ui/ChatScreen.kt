@@ -273,7 +273,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         }
         // Основная рабочая область без старой верхней панели.
         Column(
-            Modifier.fillMaxSize().background(Color(0xFF19191B))
+            Modifier.weight(1f).fillMaxHeight().background(Color(0xFF19191B))
         ) {
             Row(
                 Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 18.dp),
