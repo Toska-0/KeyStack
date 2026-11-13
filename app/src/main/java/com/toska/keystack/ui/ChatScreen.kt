@@ -101,6 +101,7 @@ import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
+import com.toska.keystack.ProviderQuota
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
 import kotlinx.coroutines.Dispatchers
