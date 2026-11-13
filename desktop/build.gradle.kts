@@ -29,7 +29,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
             packageName = "KeyStack"
-            packageVersion = "1.4.0"
+            packageVersion = "0.1.0"
             description = "KeyStack - chat with AI models"
             vendor = "Toska"
 
