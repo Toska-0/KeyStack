@@ -19,6 +19,7 @@ val MistralGradient = listOf(
 @Composable
 fun KeyStackTheme(
     themeMode: String = "system",
+    accentColor: String = "orange",
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -27,9 +28,10 @@ fun KeyStackTheme(
         else -> isSystemInDarkTheme()
     }
     // Динамические цвета Material You доступны только на Android 12+ — на десктопе свои схемы
+    val accent = when (accentColor) { "blue" -> Color(0xFF4D8DFF); "purple" -> Color(0xFF9B72E8); "green" -> Color(0xFF35A879); "pink" -> Color(0xFFE65B91); "cyan" -> Color(0xFF20AFC2); else -> Color(0xFFFF5A1F) }
     val colorScheme = when {
         themeMode == "amoled" -> darkColorScheme(
-            primary = Color(0xFFFF5A1F),
+            primary = accent,
             onPrimary = Color.White,
             background = Color.Black,
             onBackground = Color(0xFFF4F1EE),
@@ -65,7 +67,7 @@ fun KeyStackTheme(
             outline = Color(0xFF49413D)
         )
         else -> lightColorScheme(
-            primary = Color(0xFFE94F16),
+            primary = accent,
             onPrimary = Color.White,
             background = Color(0xFFFAF8F6),
             onBackground = Color(0xFF252321),
