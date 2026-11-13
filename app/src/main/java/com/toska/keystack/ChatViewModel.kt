@@ -202,7 +202,7 @@ class ChatViewModel : ViewModel() {
                 val key = candidate.second
                 val modelId = candidate.third.first
                 val base = candidate.third.second
-                _apiStatus.value = if (index == 0) "Подключение к ${p.name}…" else "Пробую резервный провайдер: ${p.name}"
+                _apiStatus.value = "Подключение к ${p.name}…"
                 val attemptText = StringBuilder()
                 var failure: String? = null
                 client.stream(p, key, base, modelId, apiMessages).collect { ev ->
