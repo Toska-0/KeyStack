@@ -39,10 +39,11 @@ fun main() = application {
         title = "KeyStack",
         state = rememberWindowState(width = 1280.dp, height = 832.dp)
     ) {
-        var systemDark by remember { mutableStateOf(readWindowsDarkMode() ?: isSystemInDarkTheme()) }
-        LaunchedEffect(Unit) {
+        val composeSystemDark = isSystemInDarkTheme()
+        var systemDark by remember { mutableStateOf(readWindowsDarkMode() ?: composeSystemDark) }
+        LaunchedEffect(composeSystemDark) {
             while (true) {
-                systemDark = readWindowsDarkMode() ?: isSystemInDarkTheme()
+                systemDark = readWindowsDarkMode() ?: composeSystemDark
                 delay(2000)
             }
         }
