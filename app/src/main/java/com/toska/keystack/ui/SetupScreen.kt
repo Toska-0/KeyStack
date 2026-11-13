@@ -8,29 +8,36 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,7 +67,8 @@ fun SetupScreen(
     var model by remember { mutableStateOf(initial.model) }
     var baseUrl by remember { mutableStateOf(initial.baseUrl) }
     var showKey by remember { mutableStateOf(false) }
-    var dropdown by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
+    var search by remember { mutableStateOf("") }
 
     var fetchedModels by remember { mutableStateOf<List<String>?>(null) }
     var loadingModels by remember { mutableStateOf(false) }
@@ -110,6 +118,7 @@ fun SetupScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -178,26 +187,39 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            ExposedDropdownMenuBox(expanded = dropdown, onExpandedChange = { dropdown = it }) {
+            if (options.isNotEmpty()) {
+                // Выбор модели только из списка — вручную вписать нельзя
+                Card(
+                    onClick = {
+                        search = ""
+                        showSheet = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Модель",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                model.ifBlank { "Нажми, чтобы выбрать" },
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Выбрать модель")
+                    }
+                }
+            } else {
+                // Кастомный провайдер: список моделей получить неоткуда — manual input
                 OutlinedTextField(
                     value = model,
                     onValueChange = { model = it },
-                    label = { Text("Модель") },
+                    label = { Text("ID модели") },
                     singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+                    modifier = Modifier.fillMaxWidth()
                 )
-                if (options.isNotEmpty()) {
-                    ExposedDropdownMenu(expanded = dropdown, onDismissRequest = { dropdown = false }) {
-                        options.forEach { m ->
-                            DropdownMenuItem(
-                                text = { Text(m) },
-                                onClick = { model = m; dropdown = false }
-                            )
-                        }
-                    }
-                }
             }
 
             when {
@@ -209,11 +231,11 @@ fun SetupScreen(
                     Text("Загружаю модели, доступные с этим ключом…", style = MaterialTheme.typography.bodySmall)
                 }
                 fetchedModels != null && fetchedModels!!.isNotEmpty() -> Text(
-                    "Доступно моделей: ${fetchedModels!!.size} — выбери из списка",
+                    "Доступно моделей: ${fetchedModels!!.size}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                fetchFailed -> Text(
+                fetchFailed && options.isEmpty() -> Text(
                     "Не удалось получить список моделей — впиши ID модели вручную",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
@@ -236,6 +258,51 @@ fun SetupScreen(
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (showSheet) {
+        val sheetState = rememberModalBottomSheetState()
+        val filtered = options.filter { it.contains(search.trim(), ignoreCase = true) }
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Text("Выбор модели", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = { Text("Поиск") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                    items(filtered) { m ->
+                        val trailing: @Composable (() -> Unit)? = if (m == model) {
+                            { Icon(Icons.Default.Check, contentDescription = "Выбрана") }
+                        } else null
+                        ListItem(
+                            headlineContent = { Text(m) },
+                            trailingContent = trailing,
+                            modifier = Modifier.clickable {
+                                model = m
+                                showSheet = false
+                            }
+                        )
+                    }
+                }
+                if (filtered.isEmpty()) {
+                    Text(
+                        "Ничего не найдено",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }
