@@ -120,7 +120,7 @@ suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
     withContext(Dispatchers.IO) {
-        chooser.selectedFiles.mapNotNull { f ->
+        (chooser.selectedFiles.toList().ifEmpty { listOfNotNull(chooser.selectedFile) }).mapNotNull { f ->
             runCatching {
                 val bytes = f.readBytes()
                 if (bytes.size > 8_000_000) return@mapNotNull null
@@ -136,16 +136,21 @@ suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
     }
 }
 
-/** Диалог выбора текстовых файлов. */
-suspend fun pickTextFiles(): List<PendingFile> = withContext(Dispatchers.Swing) {
+/** Выбор документов и исходных файлов, содержимое которых можно передать модели как текст. */
+suspend fun pickDocuments(): List<PendingFile> = withContext(Dispatchers.Swing) {
+    val extensions = arrayOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
     val chooser = JFileChooser().apply {
-        dialogTitle = "Выберите файлы"
+        dialogTitle = "Прикрепить документ или файл с текстом"
         setMultiSelectionEnabled(true)
+        fileFilter = FileNameExtensionFilter("Документы и исходный код", *extensions)
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
     withContext(Dispatchers.IO) {
-        chooser.selectedFiles.mapNotNull { f ->
-            runCatching { PendingFile(f.name, f.readText(Charsets.UTF_8).take(100_000)) }.getOrNull()
+        (chooser.selectedFiles.toList().ifEmpty { listOfNotNull(chooser.selectedFile) }).mapNotNull { file ->
+            runCatching {
+                require(file.isFile && file.length() <= 2_000_000L)
+                PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000))
+            }.getOrNull()
         }
     }
 }
@@ -164,8 +169,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val scope = rememberCoroutineScope()
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
-    var chatSearch by remember { mutableStateOf("") }
-    var workspaceMode by remember { mutableStateOf("Работа") }
     val listState = rememberLazyListState()
 
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
