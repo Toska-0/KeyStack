@@ -18,6 +18,7 @@ internal fun buildWorkspacePrompt(workspacePath: String): String {
     runCatching {
         Files.walk(root, 4).use { paths ->
             paths.filter { Files.isRegularFile(it) }
+                .filterNot { Files.isSymbolicLink(it) }
                 .filterNot { it.fileName.toString().startsWith(".") }
                 .filter { it.fileName.toString().substringAfterLast('.', "").lowercase() in
                     setOf("txt", "md", "json", "csv", "xml", "html", "htm", "css", "js", "ts", "kt", "java", "py", "yaml", "yml", "toml", "ini", "log") }
@@ -76,6 +77,11 @@ internal fun applyWorkspaceWrites(workspacePath: String, response: String): Pair
             Files.createDirectories(target.parent)
             val realParent = target.parent.toRealPath()
             require(realParent.startsWith(root)) { "Символическая ссылка за пределы рабочей папки запрещена" }
+            if (Files.exists(target)) {
+                require(!Files.isSymbolicLink(target) && target.toRealPath().startsWith(root)) {
+                    "Запись через символическую ссылку запрещена"
+                }
+            }
             Files.writeString(target, body, Charsets.UTF_8)
             "Создан/обновлён: " + root.relativize(target).toString().replace(File.separatorChar, '/')
         }.getOrElse { "Не удалось записать «$relative»: " + (it.message ?: "ошибка доступа") }
