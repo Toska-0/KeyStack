@@ -95,6 +95,7 @@ import com.toska.keystack.UiMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 import java.util.Base64
 import javax.swing.JFileChooser
@@ -107,7 +108,7 @@ data class PendingFile(val name: String, val text: String)
 suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
     val chooser = JFileChooser().apply {
         dialogTitle = "Выберите картинки"
-        multiSelectionEnabled = true
+        setMultiSelectionEnabled(true)
         fileFilter = FileNameExtensionFilter("Изображения (jpg, png, webp, gif)", "jpg", "jpeg", "png", "webp", "gif")
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
