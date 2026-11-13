@@ -79,7 +79,7 @@ fun AppRoot(dataDir: File, systemDark: Boolean) {
     }
     SideEffect { applyWindowsTitleBarTheme(windowDark) }
 
-    KeyStackTheme(themeMode = settings.themeMode) {
+    KeyStackTheme(themeMode = settings.themeMode, accentColor = settings.accentColor) {
         if (showSetup) {
             SetupScreen(
                 initial = settings,
@@ -93,6 +93,7 @@ fun AppRoot(dataDir: File, systemDark: Boolean) {
                 onSaveWorkspace = { path ->
                     scope.launch { settingsStore.saveWorkspace(path) }
                 },
+                onSaveAccentColor = { color -> scope.launch { settingsStore.saveAccentColor(color) } },
                 onSaveUiPreferences = { fontScale, messageWidth, animationsEnabled ->
                     scope.launch { settingsStore.saveUiPreferences(fontScale, messageWidth, animationsEnabled) }
                 },
