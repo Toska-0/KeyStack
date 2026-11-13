@@ -171,6 +171,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val scope = rememberCoroutineScope()
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
+    var editMessageTarget by remember { mutableStateOf<Int?>(null) }
+    var editMessageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
@@ -391,6 +393,29 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 }
             }
         }
+    }
+
+    editMessageTarget?.let { index ->
+        AlertDialog(
+            onDismissRequest = { editMessageTarget = null },
+            title = { Text("Изменить сообщение") },
+            text = {
+                OutlinedTextField(
+                    value = editMessageText,
+                    onValueChange = { editMessageText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 8
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.editMessage(index, editMessageText)
+                    editMessageTarget = null
+                }, enabled = editMessageText.isNotBlank()) { Text("Сохранить и повторить") }
+            },
+            dismissButton = { TextButton(onClick = { editMessageTarget = null }) { Text("Отмена") } }
+        )
     }
 
     // Шторка переключения провайдера и модели
@@ -822,6 +847,20 @@ fun MessageBubble(
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp)
                         )
                     }
+                }
+            }
+        }
+        if (isUser && !msg.isStreaming) {
+            Row {
+                TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "Изменить", modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Изменить", style = MaterialTheme.typography.labelMedium)
+                }
+                TextButton(onClick = onBranch, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text("↳", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Ветка", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
