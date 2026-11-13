@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -57,6 +58,19 @@ class LlmClient {
                 val usage = data["usage"]?.jsonPrimitive?.doubleOrNull
                 if (limit == null || remaining == null) return@withContext null
                 ProviderQuota(usage ?: (limit - remaining).coerceAtLeast(0.0), limit, remaining.coerceAtLeast(0.0))
+            }
+        } catch (_: Exception) { null }
+    }
+    /** Точная длина контекстного окна модели из публичного каталога OpenRouter. */
+    suspend fun fetchModelContextLimit(provider: Provider, model: String): Int? = withContext(Dispatchers.IO) {
+        if (provider.id != "openrouter" || model.isBlank()) return@withContext null
+        try {
+            val request = Request.Builder().url("https://openrouter.ai/api/v1/models").get().build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val data = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject["data"]?.jsonArray ?: return@withContext null
+                data.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull == model }
+                    ?.jsonObject?.get("context_length")?.jsonPrimitive?.intOrNull
             }
         } catch (_: Exception) { null }
     }
