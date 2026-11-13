@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -31,6 +32,7 @@ sealed interface StreamEvent {
 }
 
 private data class ModelEntry(val id: String, val free: Boolean?)
+data class ProviderQuota(val used: Double, val limit: Double, val remaining: Double, val currency: String = "$")
 
 class LlmClient {
 
@@ -41,6 +43,23 @@ class LlmClient {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Реальная квота OpenRouter из /auth/key: лимит ключа, не контекстное окно модели. */
+    suspend fun fetchQuota(provider: Provider, apiKey: String): ProviderQuota? = withContext(Dispatchers.IO) {
+        if (provider.id != "openrouter" || apiKey.isBlank()) return@withContext null
+        try {
+            val request = Request.Builder().url("https://openrouter.ai/api/v1/auth/key")
+                .header("Authorization", "Bearer $apiKey").get().build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val data = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject["data"]?.jsonObject ?: return@withContext null
+                val limit = data["limit"]?.jsonPrimitive?.doubleOrNull
+                val remaining = data["limit_remaining"]?.jsonPrimitive?.doubleOrNull
+                val usage = data["usage"]?.jsonPrimitive?.doubleOrNull
+                if (limit == null || remaining == null) return@withContext null
+                ProviderQuota(usage ?: (limit - remaining).coerceAtLeast(0.0), limit, remaining.coerceAtLeast(0.0))
+            }
+        } catch (_: Exception) { null }
+    }
     /**
      * Загружает список моделей, доступных с этим ключом.
      * Для OpenRouter: если ключ бесплатного тарифа — остаются только бесплатные модели.
