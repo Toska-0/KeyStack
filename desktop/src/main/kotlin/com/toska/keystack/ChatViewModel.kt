@@ -199,10 +199,16 @@ class ChatViewModel {
                     }
                 }
             val final = sb.toString()
+            val (visibleAnswer, fileResults) = withContext(Dispatchers.IO) {
+                applyWorkspaceWrites(s.workspacePath, final)
+            }
+            val completedAnswer = if (fileResults.isEmpty()) visibleAnswer else {
+                visibleAnswer.trimEnd() + "\n\n" + fileResults.joinToString("\n") { "✓ $it" }
+            }
             _messages.value = if (final.isBlank() && _error.value != null) {
                 _messages.value.dropLast(1)
             } else {
-                _messages.value.dropLast(1) + UiMessage("assistant", final)
+                _messages.value.dropLast(1) + UiMessage("assistant", completedAnswer)
             }
             _busy.value = false
             persistCurrentMessages()
