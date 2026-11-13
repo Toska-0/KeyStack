@@ -16,26 +16,24 @@ internal fun buildWorkspacePrompt(workspacePath: String): String {
     val snapshot = StringBuilder()
     var included = 0
     runCatching {
-        Files.walk(root, 4).use { paths ->
-            paths.filter { Files.isRegularFile(it) }
-                .filterNot { Files.isSymbolicLink(it) }
-                .filterNot { it.fileName.toString().startsWith(".") }
-                .filter { it.fileName.toString().substringAfterLast('.', "").lowercase() in
-                    setOf("txt", "md", "json", "csv", "xml", "html", "htm", "css", "js", "ts", "kt", "java", "py", "yaml", "yml", "toml", "ini", "log") }
-                .sorted()
-                .forEach { file ->
-                    if (snapshot.length < MAX_WORKSPACE_CONTEXT_CHARS) {
-                        runCatching {
-                            if (Files.size(file) <= MAX_WORKSPACE_FILE_BYTES) {
-                                val text = Files.readString(file)
-                                val relative = root.relativize(file).toString().replace(File.separatorChar, '/')
-                                snapshot.append("\n--- Файл: ").append(relative).append(" ---\n")
-                                    .append(text.take(12_000)).append("\n")
-                                included++
-                            }
-                        }
+        Files.walk(root, 4).use { stream ->
+            val iterator = stream.iterator()
+            while (iterator.hasNext() && snapshot.length < MAX_WORKSPACE_CONTEXT_CHARS) {
+                val file: java.nio.file.Path = iterator.next()
+                if (!Files.isRegularFile(file) || Files.isSymbolicLink(file) ||
+                    file.fileName.toString().startsWith(".")) continue
+                val extension = file.fileName.toString().substringAfterLast('.', "").lowercase()
+                if (extension !in setOf("txt", "md", "json", "csv", "xml", "html", "htm", "css", "js", "ts", "kt", "java", "py", "yaml", "yml", "toml", "ini", "log")) continue
+                runCatching {
+                    if (Files.size(file) <= MAX_WORKSPACE_FILE_BYTES) {
+                        val text = Files.readString(file)
+                        val relative = root.relativize(file).toString().replace(File.separatorChar, '/')
+                        snapshot.append("\\n--- Файл: ").append(relative).append(" ---\\n")
+                            .append(text.take(12_000)).append("\\n")
+                        included++
                     }
                 }
+            }
         }
     }
 
