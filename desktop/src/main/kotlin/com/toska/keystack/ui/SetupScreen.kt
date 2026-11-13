@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.Settings
+import com.toska.keystack.ui.theme.MistralGradient
 import javax.swing.JFileChooser
 import kotlinx.coroutines.delay
 
