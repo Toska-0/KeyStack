@@ -409,7 +409,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.width(76.dp)) { LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth()) }
                 } else {
-                    Text("Лимит не раскрывается API · использовано ≈ $estimatedContextTokens токенов · использовано ≈ $estimatedContextTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Лимит не раскрывается API · использовано ≈ $estimatedContextTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (settings.providerId == "openrouter" && quota != null) {
                     val q = quota!!
