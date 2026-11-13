@@ -332,7 +332,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     }
                 }
             } else {
-                Column(Modifier.fillMaxSize().imePadding()) {
+                Column(Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
