@@ -7,6 +7,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+/** Фирменный градиент Mistral — от жёлтого к красному (логотипы, кнопка отправки). */
+val MistralGradient = listOf(
+    Color(0xFFFFD800),
+    Color(0xFFFFAF00),
+    Color(0xFFFF8205),
+    Color(0xFFFA500F),
+    Color(0xFFE10500)
+)
+
 @Composable
 fun KeyStackTheme(
     themeMode: String = "system",
@@ -23,13 +32,19 @@ fun KeyStackTheme(
             primary = Color(0xFFFF5A1F),
             onPrimary = Color.White,
             background = Color.Black,
+            onBackground = Color(0xFFF4F1EE),
             surface = Color.Black,
+            onSurface = Color(0xFFF4F1EE),
             surfaceVariant = Color(0xFF141414),
+            onSurfaceVariant = Color(0xFFB8B2AD),
             surfaceContainer = Color(0xFF0D0D0D),
             surfaceContainerLow = Color(0xFF0A0A0A),
             surfaceContainerLowest = Color.Black,
             surfaceContainerHigh = Color(0xFF141414),
-            surfaceContainerHighest = Color(0xFF1A1A1A)
+            surfaceContainerHighest = Color(0xFF1A1A1A),
+            secondaryContainer = Color(0xFF38251F),
+            onSecondaryContainer = Color(0xFFFFD8CB),
+            outline = Color(0xFF49413D)
         )
         false -> darkColorScheme()
         darkTheme -> darkColorScheme(
@@ -54,6 +69,7 @@ fun KeyStackTheme(
             primary = Color(0xFFE94F16),
             onPrimary = Color.White,
             background = Color(0xFFFAF8F6),
+            onBackground = Color(0xFF252321),
             surface = Color(0xFFFFFEFC),
             onSurface = Color(0xFF252321),
             surfaceVariant = Color(0xFFF1EEEB),
