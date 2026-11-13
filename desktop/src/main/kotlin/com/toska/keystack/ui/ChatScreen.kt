@@ -475,7 +475,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         onAttach = { attachMenu = true },
                         attachMenu = attachMenu,
                         onDismissAttach = { attachMenu = false },
-                        onPickImages = { scope.launch { loadingAttachments = true; pendingImages = (pendingImages + pickImages()).distinct().take(4); loadingAttachments = false } },
+                        onPickImages = { scope.launch { loadingAttachments = true; pendingImages = (pendingImages + pickImages()).distinct().take(4); val history = File(System.getProperty("user.home"), ".keystack/attachment-history.txt"); recentAttachmentPaths = runCatching { if (history.exists()) history.readLines().filter { File(it).exists() }.take(12) else emptyList() }.getOrDefault(emptyList()); loadingAttachments = false } },
                         onPickFiles = { scope.launch { loadingAttachments = true; val picked = pickDocuments(); pendingFiles = (pendingFiles + picked).distinctBy { it.path.ifBlank { it.name } }; saveRecentAttachmentPaths(picked.map { it.path }); loadingAttachments = false } },
                         onPasteImageValue = { pendingImages = (pendingImages + it).distinct().take(4) },
                         onPickRecent = { recentPickerOpen = true },
