@@ -41,7 +41,7 @@ class SettingsStore(private val context: Context) {
     private val keyBase = stringPreferencesKey("base_url") // legacy
     private val keyCreds = stringPreferencesKey("creds_json")
     private val keyTheme = stringPreferencesKey("theme_mode")
-    private val keyDynamic = stringPreferencesKey("dynamic_color")
+    private val keyDynamic = booleanPreferencesKey("dynamic_color")
 
     private val json = Json { ignoreUnknownKeys = true }
 
