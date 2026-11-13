@@ -93,6 +93,9 @@ fun AppRoot(dataDir: File, systemDark: Boolean) {
                 onSaveWorkspace = { path ->
                     scope.launch { settingsStore.saveWorkspace(path) }
                 },
+                onSaveUiPreferences = { fontScale, messageWidth, animationsEnabled ->
+                    scope.launch { settingsStore.saveUiPreferences(fontScale, messageWidth, animationsEnabled) }
+                },
                 onBack = if (settings.providerId.isNotBlank() && settings.apiKey.isNotBlank()) {
                     { showSetup = false }
                 } else null
