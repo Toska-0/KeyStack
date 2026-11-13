@@ -62,6 +62,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
@@ -98,6 +99,7 @@ import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
+import com.toska.keystack.ProviderQuota
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
 import kotlinx.coroutines.Dispatchers
@@ -188,6 +190,25 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 
     // Переключатель провайдера/модели
     var showSwitcher by remember { mutableStateOf(false) }
+    var quota by remember { mutableStateOf<ProviderQuota?>(null) }
+    var quotaChecked by remember { mutableStateOf(false) }
+    var quotaStatus by remember { mutableStateOf("Проверка API…") }
+
+    LaunchedEffect(settings.providerId, settings.apiKey) {
+        quota = null
+        quotaChecked = false
+        quotaStatus = if (settings.apiKey.isBlank()) "API-ключ не настроен" else "Проверка API…"
+        while (true) {
+            if (settings.apiKey.isNotBlank()) {
+                quota = client.fetchQuota(Providers.byId(settings.providerId), settings.apiKey)
+                quotaChecked = true
+                quotaStatus = if (settings.providerId == "openrouter") {
+                    if (quota != null) "API подключён" else "Квота OpenRouter недоступна"
+                } else "API-статус определяется по последнему запросу"
+            }
+            delay(60_000)
+        }
+    }
 
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -286,6 +307,31 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 Text("⋯", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable { vm.clearChat() })
             }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(7.dp).background(
+                    if (quota != null || (settings.providerId != "openrouter" && settings.apiKey.isNotBlank())) Color(0xFF45B879) else Color(0xFFB58A45),
+                    CircleShape
+                ))
+                Spacer(Modifier.width(7.dp))
+                Text(quotaStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.weight(1f))
+                if (settings.providerId == "openrouter" && quota != null) {
+                    val q = quota!!
+                    val usedFraction = if (q.limit > 0) (q.used / q.limit).toFloat().coerceIn(0f, 1f) else 0f
+                    Text("$" + "%.2f".format(q.remaining) + " осталось из $" + "%.2f".format(q.limit),
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.width(86.dp)) {
+                        LinearProgressIndicator(progress = { usedFraction }, modifier = Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Text(if (settings.providerId == "openrouter") "Реальная квота не получена" else "Лимит не раскрывается API",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             if (messages.isNotEmpty()) {
                 OutlinedTextField(
                     value = messageSearch,
@@ -374,7 +420,10 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     ) {
                         itemsIndexed(messages) { idx, msg ->
                             if (messageSearch.isBlank() || msg.content.contains(messageSearch, ignoreCase = true)) MessageBubble(msg = msg, isLastAssistant = idx == lastAssistantIdx, busy = busy,
-                                onRegenerate = { vm.regenerate() })
+                                onRegenerate = { vm.regenerate() },
+                                fontScale = settings.fontScale,
+                                maxWidth = settings.messageWidth,
+                                animationsEnabled = settings.animationsEnabled)
                         }
                     }
                     error?.let { err ->
@@ -821,7 +870,10 @@ fun MessageBubble(
     busy: Boolean = false,
     onRegenerate: () -> Unit = {},
     onEdit: () -> Unit = {},
-    onBranch: () -> Unit = {}
+    onBranch: () -> Unit = {},
+    fontScale: Float = 1f,
+    maxWidth: Int = 760,
+    animationsEnabled: Boolean = true
 ) {
     val isUser = msg.role == "user"
     val clipboard = LocalClipboardManager.current
@@ -829,8 +881,8 @@ fun MessageBubble(
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
     val enterProgress by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0f,
-        animationSpec = tween(durationMillis = 260),
+        targetValue = if (appeared || !animationsEnabled) 1f else 0f,
+        animationSpec = tween(durationMillis = if (animationsEnabled) 260 else 0),
         label = "message-enter"
     )
 
@@ -842,14 +894,14 @@ fun MessageBubble(
     }
 
     Column(
-        Modifier.fillMaxWidth().graphicsLayer {
+        Modifier.fillMaxWidth().then(if (animationsEnabled) Modifier.graphicsLayer {
             alpha = enterProgress
             translationY = (1f - enterProgress) * 12f
-        },
+        } else Modifier),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         Surface(
-            modifier = Modifier.animateContentSize(tween(180)),
+            modifier = if (animationsEnabled) Modifier.animateContentSize(tween(180)) else Modifier,
             color = if (isUser) Color(0xFF39251F) else Color(0xFF202024),
             shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(18.dp),
             border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF34343A))
@@ -857,7 +909,7 @@ fun MessageBubble(
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
             } else {
-                Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp).widthIn(max = 760.dp)) {
+                Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp).widthIn(max = maxWidth.dp)) {
                     if (isUser && msg.images.isNotEmpty()) {
                         Text(
                             "📷 Фото: ${msg.images.size}",
@@ -869,7 +921,7 @@ fun MessageBubble(
                         Text(
                             msg.content + if (msg.isStreaming) " ▌" else "",
                             color = if (isUser) Color(0xFFFFE4D8) else Color(0xFFE8E8EC),
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 23.sp)
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (15f * fontScale).sp, lineHeight = (23f * fontScale).sp)
                         )
                     }
                 }
