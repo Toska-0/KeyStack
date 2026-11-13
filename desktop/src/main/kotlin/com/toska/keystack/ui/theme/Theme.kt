@@ -29,8 +29,37 @@ fun KeyStackTheme(
             surfaceContainerHigh = Color(0xFF141414),
             surfaceContainerHighest = Color(0xFF1A1A1A)
         )
-        darkTheme -> darkColorScheme()
-        else -> lightColorScheme()
+        darkTheme -> darkColorScheme(
+            primary = Color(0xFFECECEC),
+            onPrimary = Color(0xFF202020),
+            background = Color(0xFF212121),
+            onBackground = Color(0xFFECECEC),
+            surface = Color(0xFF212121),
+            onSurface = Color(0xFFECECEC),
+            surfaceVariant = Color(0xFF303030),
+            onSurfaceVariant = Color(0xFFB4B4B4),
+            surfaceContainer = Color(0xFF262626),
+            surfaceContainerLow = Color(0xFF252525),
+            surfaceContainerLowest = Color(0xFF202020),
+            surfaceContainerHigh = Color(0xFF303030),
+            surfaceContainerHighest = Color(0xFF383838),
+            secondaryContainer = Color(0xFF303030),
+            onSecondaryContainer = Color(0xFFECECEC),
+            outline = Color(0xFF555555)
+        )
+        else -> lightColorScheme(
+            primary = Color(0xFF202020),
+            onPrimary = Color.White,
+            background = Color(0xFFFFFFFF),
+            surface = Color(0xFFFFFFFF),
+            surfaceVariant = Color(0xFFF4F4F4),
+            surfaceContainer = Color(0xFFF7F7F7),
+            surfaceContainerLow = Color(0xFFFAFAFA),
+            surfaceContainerHigh = Color(0xFFF1F1F1),
+            surfaceContainerHighest = Color(0xFFEAEAEA),
+            secondaryContainer = Color(0xFFECECEC),
+            outline = Color(0xFFD7D7D7)
+        )
     }
     MaterialTheme(colorScheme = colorScheme, content = content)
 }
