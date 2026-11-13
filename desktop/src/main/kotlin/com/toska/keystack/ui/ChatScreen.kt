@@ -182,12 +182,26 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerContentColor = MaterialTheme.colorScheme.onSurface
+            ) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Чаты", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(7.dp), modifier = Modifier.size(28.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("K", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text("KeyStack", style = MaterialTheme.typography.titleMedium)
+                            Text("AI workspace", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     FilledTonalIconButton(onClick = {
                         vm.newChat()
                         scope.launch { drawerState.close() }
@@ -226,6 +240,9 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         Scaffold(
             topBar = {
                 TopAppBar(
+                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
                             Icon(Icons.Default.Menu, contentDescription = "Список чатов")
@@ -234,10 +251,10 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     title = {
                         // Тап по заголовку — смена провайдера/модели прямо в чате
                         Column(Modifier.clickable { showSwitcher = true }) {
-                            Text(currentSession?.title ?: "KeyStack", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(currentSession?.title ?: "Новая задача", maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    provider.name + " • " + settings.model.ifBlank { "модель не выбрана" },
+                                    provider.name + "  /  " + settings.model.ifBlank { "Модель не выбрана" },
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -267,7 +284,13 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     .background(MaterialTheme.colorScheme.background)
                     .padding(padding)
             ) {
-                LazyColumn(
+                if (messages.isEmpty()) {
+                    VibeWelcomePanel(
+                        providerName = provider.name,
+                        onPrompt = { input = it }
+                    )
+                } else {
+                    LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
@@ -280,6 +303,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             busy = busy,
                             onRegenerate = { vm.regenerate() }
                         )
+                    }
                     }
                 }
 
@@ -322,7 +346,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                         .padding(horizontal = 18.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     // Плюс — прикрепить фото или файл
@@ -363,9 +387,9 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         value = input,
                         onValueChange = { input = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Сообщение…") },
+                        placeholder = { Text("Спросите что-нибудь…") },
                         maxLines = 5,
-                        shape = RoundedCornerShape(28.dp),
+                        shape = RoundedCornerShape(26.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -395,7 +419,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             },
                             enabled = input.isNotBlank() || pendingImages.isNotEmpty()
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = "Отправить")
+                            Icon(Icons.Default.Send, contentDescription = "Отправить", tint = Color.White)
                         }
                     }
                 }
@@ -537,6 +561,68 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 }
 
 @Composable
+private fun VibeWelcomePanel(
+    providerName: String,
+    onPrompt: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 28.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            color = Color(0xFFFF5A1F),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.size(54.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("K", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+        Text(
+            "Что будем создавать?",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "KeyStack • $providerName",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(28.dp))
+        Column(
+            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            listOf(
+                "Помоги разобраться в сложной теме",
+                "Проанализируй файл и сделай краткое резюме",
+                "Придумай план для моего проекта"
+            ).forEach { prompt ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { onPrompt(prompt) },
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("✦", color = Color(0xFFFF5A1F), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.width(12.dp))
+                        Text(prompt, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text("↗", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ChatListItem(
     session: ChatSession,
     selected: Boolean,
@@ -550,10 +636,11 @@ fun ChatListItem(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(
-                if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+             .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                RoundedCornerShape(12.dp)
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
@@ -632,7 +719,7 @@ fun MessageBubble(
     ) {
         Surface(
             color = if (isUser) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-            shape = RoundedCornerShape(22.dp)
+            shape = RoundedCornerShape(20.dp)
         ) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
