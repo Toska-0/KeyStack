@@ -23,6 +23,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Restore debug keystore
+        uses: actions/cache@v4
+        with:
+          path: debug.keystore
+          key: keystack-keystore-v1
+
+      - name: Generate debug keystore (once)
+        shell: bash
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -alias keystack \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=KeyStack, OU=KeyStack, O=KeyStack, C=RU"
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -32,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle assembleDebug --stacktrace 2>&1 | tee build.log
+          gradle assembleDebug assembleRelease --stacktrace 2>&1 | tee build.log
 
       - name: Save log to branch
         if: failure()
@@ -67,22 +85,19 @@ jobs:
           } > issue_body.md || true
           gh issue create --title "Build failed (run ${{ github.run_number }})" --body-file issue_body.md || true
 
-      - name: Upload build log (on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
-
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: KeyStack-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: KeyStack-apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release.apk
 
-      - name: Attach APK to release
+      - name: Attach APKs to release
         if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release.apk
