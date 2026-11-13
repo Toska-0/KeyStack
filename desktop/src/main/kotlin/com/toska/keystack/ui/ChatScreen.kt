@@ -270,16 +270,20 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     // Переключатель провайдера/модели
     var showSwitcher by remember { mutableStateOf(false) }
     var quota by remember { mutableStateOf<ProviderQuota?>(null) }
+    var modelContextLimit by remember { mutableStateOf<Int?>(null) }
+    val estimatedContextTokens by vm.tokenEstimate.collectAsState()
     var quotaChecked by remember { mutableStateOf(false) }
     var quotaStatus by remember { mutableStateOf("Проверка API…") }
 
     LaunchedEffect(settings.providerId, settings.apiKey) {
         quota = null
+        modelContextLimit = null
         quotaChecked = false
         quotaStatus = if (settings.apiKey.isBlank()) "API-ключ не настроен" else "Проверка API…"
         while (true) {
             if (settings.apiKey.isNotBlank()) {
                 quota = client.fetchQuota(Providers.byId(settings.providerId), settings.apiKey)
+                modelContextLimit = client.fetchModelContextLimit(Providers.byId(settings.providerId), settings.model)
                 quotaChecked = true
                 quotaStatus = if (settings.providerId == "openrouter") {
                     if (quota != null) "API подключён" else "Квота OpenRouter недоступна"
@@ -397,6 +401,14 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 Spacer(Modifier.width(7.dp))
                 Text(if (settings.providerId == "openrouter") quotaStatus else apiStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.weight(1f))
+                if (modelContextLimit != null) {
+                    val contextFraction = (estimatedContextTokens.toFloat() / modelContextLimit!!.coerceAtLeast(1)).coerceIn(0f, 1f)
+                    Text("Контекст ≈ " + estimatedContextTokens + " / " + modelContextLimit + " токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.width(76.dp)) { LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth()) }
+                } else {
+                    Text("Лимит контекста не опубликован API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (settings.providerId == "openrouter" && quota != null) {
                     val q = quota!!
                     val usedFraction = if (q.limit > 0) (q.used / q.limit).toFloat().coerceIn(0f, 1f) else 0f
