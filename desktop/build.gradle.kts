@@ -29,7 +29,7 @@ compose.desktop {
             targetFormats(TargetFormat.Msi)
             packageName = "KeyStack"
             packageVersion = "1.4.0"
-            description = "KeyStack — чат с нейросетями"
+            description = "KeyStack - chat with AI models"
             vendor = "Toska"
 
             windows {
