@@ -380,7 +380,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         val contextFraction = (estimatedContextTokens.toFloat() / modelContextLimit!!.coerceAtLeast(1)).coerceIn(0f, 1f)
                         Text("Контекст ≈ " + estimatedContextTokens + " / " + modelContextLimit + " токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth())
-                    } else Text("Лимит контекста не опубликован API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else Text("Лимит не раскрывается API · использовано ≈ $estimatedContextTokens токенов · использовано ≈ $estimatedContextTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (settings.providerId == "openrouter" && quota != null) {
                         val q = quota!!
                         val fraction = if (q.second > 0) (q.first / q.second).toFloat().coerceIn(0f, 1f) else 0f
@@ -933,14 +933,18 @@ fun MessageBubble(
                 }
             }
         }
-        if (!isUser && !msg.isStreaming && msg.content.isNotBlank()) {
+        if (!isUser && (msg.isStreaming || msg.content.isNotBlank())) {
             Row(
-                modifier = Modifier.padding(start = 8.dp, top = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
+                horizontalArrangement = Arrangement.End,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (msg.generationMs > 0L) Text("${"%.1f".format(msg.generationMs / 1000.0)} с", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (msg.isStreaming && msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов · генерируется", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                else {
+                    if (msg.generationMs > 0L) Text("${"%.1f".format(msg.generationMs / 1000.0)} с", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         // Кнопки под ответом ИИ: копировать и перегенерировать
