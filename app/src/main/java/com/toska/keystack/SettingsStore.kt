@@ -27,7 +27,8 @@ data class Settings(
     val savedBaseUrls: Map<String, String> = emptyMap(),
     val fontScale: Float = 1f,
     val messageWidth: Int = 760,
-    val animationsEnabled: Boolean = true
+    val animationsEnabled: Boolean = true,
+    val accentColor: String = "orange"
 )
 
 /** Ключи/модели/baseURL хранятся отдельно для каждого провайдера. */
@@ -50,6 +51,7 @@ class SettingsStore(private val context: Context) {
     private val keyFontScale = floatPreferencesKey("font_scale")
     private val keyMessageWidth = intPreferencesKey("message_width")
     private val keyAnimations = booleanPreferencesKey("animations_enabled")
+    private val keyAccent = stringPreferencesKey("accent_color")
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -79,7 +81,8 @@ class SettingsStore(private val context: Context) {
             savedBaseUrls = creds.baseUrls,
             fontScale = p[keyFontScale] ?: 1f,
             messageWidth = p[keyMessageWidth] ?: 760,
-            animationsEnabled = p[keyAnimations] ?: true
+            animationsEnabled = p[keyAnimations] ?: true,
+            accentColor = p[keyAccent] ?: "orange"
         )
     }
 
@@ -117,6 +120,8 @@ class SettingsStore(private val context: Context) {
             p[keyAnimations] = animationsEnabled
         }
     }
+
+    suspend fun saveAccentColor(accentColor: String) { context.dataStore.edit { it[keyAccent] = accentColor } }
 
     suspend fun saveTheme(themeMode: String, dynamicColor: Boolean) {
         context.dataStore.edit { p ->
