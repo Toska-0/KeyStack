@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   build:
@@ -38,10 +39,22 @@ jobs:
         shell: bash
         run: |
           echo "## Ошибка сборки" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
           grep -n -i -E -B 2 -A 8 "error:|e: |FAILURE|Exception|Caused by" build.log | tail -250 >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Report error as issue
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo '```'
+            grep -n -i -E -B 2 -A 8 "error:|e: |FAILURE|Exception|Caused by" build.log | tail -150
+            echo '```'
+          } > issue_body.md
+          gh issue create --title "Build failed (run ${{ github.run_number }})" --body-file issue_body.md || true
 
       - name: Upload build log (on failure)
         if: failure()
