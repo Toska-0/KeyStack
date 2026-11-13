@@ -34,12 +34,22 @@ jobs:
           set -o pipefail
           gradle assembleDebug --stacktrace 2>&1 | tee build.log
 
-      - name: Publish error summary
+      - name: Save log to branch
         if: failure()
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "## Ошибка сборки" >> $GITHUB_STEP_SUMMARY
-          grep -n -i -E -B 2 -A 8 "error:|e: |FAILURE|Exception|Caused by" build.log | tail -250 >> $GITHUB_STEP_SUMMARY || true
+          set +e
+          touch build.log
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git fetch origin main || true
+          git checkout -B build-logs origin/main || git checkout --orphan build-logs
+          cp build.log build-error.log
+          git add build-error.log
+          git commit -m "build log (run ${{ github.run_number }})" || true
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" build-logs --force || true
 
       - name: Report error as issue
         if: failure()
@@ -47,13 +57,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e
           {
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo
             echo '```'
             grep -n -i -E -B 2 -A 8 "error:|e: |FAILURE|Exception|Caused by" build.log | tail -150
             echo '```'
-          } > issue_body.md
+          } > issue_body.md || true
           gh issue create --title "Build failed (run ${{ github.run_number }})" --body-file issue_body.md || true
 
       - name: Upload build log (on failure)
