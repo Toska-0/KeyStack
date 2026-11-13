@@ -28,6 +28,28 @@
 
 Готовый APK: app/build/outputs/apk/debug/app-debug.apk
 
+## Windows-версия (ветка `pc-version`)
+
+На этой ветке добавлен модуль `desktop` — порт приложения на Windows через Compose Desktop (Kotlin, тот же UI и та же логика провайдеров, что и в Android-версии).
+
+Особенности порта:
+
+- Настройки и история чатов хранятся в папке `~/.keystack` (`settings.json` и `chats.json`)
+- Вложения прикрепляются через системный диалог выбора файлов Windows
+- Динамическая тема Material You заменена на системную/светлую/тёмную/AMOLED
+
+Сборка и запуск локально (JDK 17):
+
+    gradle :desktop:run
+
+Сборка MSI-установщика:
+
+    gradle :desktop:packageDistributionForCurrentOS
+
+Готовый MSI: desktop/build/compose/binaries/main/msi/KeyStack-1.4.0.msi
+
+Сборка через GitHub Actions: workflow **Build Windows Desktop** собирает портативную zip-версию и MSI-установщик на каждый пуш в `pc-version`. При пуше тега вида `v1.4` оба файла автоматически приложатся к GitHub Release.
+
 ## Безопасность
 
 Ключ хранится локально на устройстве и отправляется только напрямую выбранному провайдеру. Никаких промежуточных серверов и телеметрии.
