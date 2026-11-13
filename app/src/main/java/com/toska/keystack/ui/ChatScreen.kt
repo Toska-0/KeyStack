@@ -121,6 +121,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
+    var chatSearch by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
@@ -218,16 +219,38 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         Icon(Icons.Default.Add, contentDescription = "Новый чат")
                     }
                 }
-                if (sessions.isEmpty()) {
-                    Text(
-                        "Пока нет чатов",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(16.dp)
+                Text(
+                    "ИСТОРИЯ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 18.dp, top = 20.dp, bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = chatSearch,
+                    onValueChange = { chatSearch = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    singleLine = true,
+                    placeholder = { Text("Найти диалог") },
+                    shape = RoundedCornerShape(13.dp),
+                    leadingIcon = { Text("⌕", style = MaterialTheme.typography.titleLarge) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
-                }
+                )
                 val sorted = sessions.sortedWith(
                     compareByDescending<ChatSession> { it.pinned }.thenByDescending { it.updatedAt }
-                )
+                ).filter { it.title.contains(chatSearch, ignoreCase = true) }
+                if (sorted.isEmpty()) {
+                    Text(
+                        if (chatSearch.isBlank()) "Здесь появятся ваши диалоги" else "Ничего не найдено",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
+                    )
+                }
                 LazyColumn {
                     items(sorted, key = { it.id }) { s ->
                         ChatListItem(
@@ -571,56 +594,74 @@ private fun VibeWelcomePanel(
     providerName: String,
     onPrompt: (String) -> Unit
 ) {
+    val prompts = listOf(
+        Triple("01", "Исследовать идею", "Разложи сложную тему на понятные шаги", "Разложи сложную тему на понятные шаги"),
+        Triple("02", "Работа с файлами", "Изучи документ и выдели главное", "Проанализируй прикреплённый файл и сделай краткое резюме"),
+        Triple("03", "План проекта", "От идеи до готового результата", "Помоги составить подробный план моего проекта")
+    )
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Surface(
-            color = Color(0xFFFF5A1F),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.size(54.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("K", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(8.dp), modifier = Modifier.size(34.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("K", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("KEYSTACK WORKSPACE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Пространство для идей и работы", style = MaterialTheme.typography.titleSmall)
+                }
             }
-        }
-        Spacer(Modifier.height(22.dp))
-        Text(
-            "Что будем создавать?",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "KeyStack • $providerName",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(28.dp))
-        Column(
-            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            listOf(
-                "Помоги разобраться в сложной теме",
-                "Проанализируй файл и сделай краткое резюме",
-                "Придумай план для моего проекта"
-            ).forEach { prompt ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth().clickable { onPrompt(prompt) },
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = RoundedCornerShape(14.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            Spacer(Modifier.height(42.dp))
+            Text(
+                "С чего начнём?",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(Modifier.height(9.dp))
+            Text(
+                "Задайте вопрос, исследуйте идею или начните новую задачу.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(50.dp)) {
+                Text(
+                    "●  $providerName  /  готов к работе",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
+                )
+            }
+            Spacer(Modifier.height(28.dp))
+            Text("БЫСТРЫЙ СТАРТ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                prompts.forEach { (number, title, subtitle, prompt) ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { onPrompt(prompt) },
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = RoundedCornerShape(15.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.28f))
                     ) {
-                        Text("✦", color = Color(0xFFFF5A1F), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.width(12.dp))
-                        Text(prompt, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text("↗", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 17.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(number, color = Color(0xFFFF5A1F), style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.width(16.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(title, style = MaterialTheme.typography.titleSmall)
+                                Spacer(Modifier.height(3.dp))
+                                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text("↗", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
