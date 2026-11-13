@@ -2,6 +2,8 @@ package com.toska.keystack
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -22,7 +24,10 @@ data class Settings(
     val dynamicColor: Boolean = true,
     val savedKeys: Map<String, String> = emptyMap(),
     val savedModels: Map<String, String> = emptyMap(),
-    val savedBaseUrls: Map<String, String> = emptyMap()
+    val savedBaseUrls: Map<String, String> = emptyMap(),
+    val fontScale: Float = 1f,
+    val messageWidth: Int = 760,
+    val animationsEnabled: Boolean = true
 )
 
 /** Ключи/модели/baseURL хранятся отдельно для каждого провайдера. */
@@ -42,6 +47,9 @@ class SettingsStore(private val context: Context) {
     private val keyCreds = stringPreferencesKey("creds_json")
     private val keyTheme = stringPreferencesKey("theme_mode")
     private val keyDynamic = booleanPreferencesKey("dynamic_color")
+    private val keyFontScale = floatPreferencesKey("font_scale")
+    private val keyMessageWidth = intPreferencesKey("message_width")
+    private val keyAnimations = booleanPreferencesKey("animations_enabled")
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -68,7 +76,10 @@ class SettingsStore(private val context: Context) {
             dynamicColor = p[keyDynamic] ?: true,
             savedKeys = creds.keys,
             savedModels = creds.models,
-            savedBaseUrls = creds.baseUrls
+            savedBaseUrls = creds.baseUrls,
+            fontScale = p[keyFontScale] ?: 1f,
+            messageWidth = p[keyMessageWidth] ?: 760,
+            animationsEnabled = p[keyAnimations] ?: true
         )
     }
 
@@ -97,6 +108,14 @@ class SettingsStore(private val context: Context) {
 
     suspend fun saveModel(providerId: String, model: String) {
         updateCreds { c -> c.copy(models = c.models + (providerId to model)) }
+    }
+
+    suspend fun saveUiPreferences(fontScale: Float, messageWidth: Int, animationsEnabled: Boolean) {
+        context.dataStore.edit { p ->
+            p[keyFontScale] = fontScale.coerceIn(0.85f, 1.4f)
+            p[keyMessageWidth] = messageWidth.coerceIn(560, 1100)
+            p[keyAnimations] = animationsEnabled
+        }
     }
 
     suspend fun saveTheme(themeMode: String, dynamicColor: Boolean) {
