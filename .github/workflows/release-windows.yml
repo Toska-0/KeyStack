@@ -1,0 +1,57 @@
+name: Release KeyStack 0.1.0 — Windows x64
+
+on:
+  push:
+    branches:
+      - release/0.1.0-windows
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build Windows x64 MSI
+        run: gradle :desktop:packageDistributionForCurrentOS --no-daemon
+
+      - name: Verify MSI output
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem "desktop/build/compose/binaries/main/msi/*.msi"
+          if (-not $msi) { throw "MSI installer was not produced." }
+          Get-Item $msi.FullName | Format-List Name,Length,FullName
+
+      - name: Publish Windows release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-windows
+          target_commitish: pc-version
+          name: KeyStack 0.1.0 — Windows x64
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## KeyStack 0.1.0 — Windows x64
+
+            Первая публичная сборка KeyStack для Windows x64.
+
+            **Файл:** MSI-установщик для 64-разрядной Windows.
+            **Установка:** скачайте MSI и запустите его, затем следуйте инструкциям установщика.
+
+            Для работы с нейросетями потребуется собственный API-ключ выбранного провайдера.
+          files: desktop/build/compose/binaries/main/msi/*.msi
