@@ -25,7 +25,8 @@ data class Settings(
     val workspacePath: String = "",
     val fontScale: Float = 1f,
     val messageWidth: Int = 760,
-    val animationsEnabled: Boolean = true
+    val animationsEnabled: Boolean = true,
+    val accentColor: String = "orange"
 )
 
 /** Состояние на диске: ключи/модели/baseURL отдельно для каждого провайдера. */
@@ -40,7 +41,8 @@ private data class StoredSettings(
     val workspacePath: String = "",
     val fontScale: Float = 1f,
     val messageWidth: Int = 760,
-    val animationsEnabled: Boolean = true
+    val animationsEnabled: Boolean = true,
+    val accentColor: String = "orange"
 )
 
 /** Десктоп-версия: настройки хранятся в settings.json в каталоге данных приложения. */
@@ -72,7 +74,8 @@ class SettingsStore(baseDir: File) {
             workspacePath = s.workspacePath,
             fontScale = s.fontScale,
             messageWidth = s.messageWidth,
-            animationsEnabled = s.animationsEnabled
+            animationsEnabled = s.animationsEnabled,
+            accentColor = s.accentColor
         )
     }
 
@@ -111,6 +114,8 @@ class SettingsStore(baseDir: File) {
     suspend fun saveModel(providerId: String, model: String) {
         update { it.copy(models = it.models + (providerId to model)) }
     }
+
+    suspend fun saveAccentColor(accentColor: String) { update { it.copy(accentColor = accentColor) } }
 
     suspend fun saveTheme(themeMode: String, dynamicColor: Boolean) {
         update { it.copy(themeMode = themeMode, dynamicColor = dynamicColor) }
