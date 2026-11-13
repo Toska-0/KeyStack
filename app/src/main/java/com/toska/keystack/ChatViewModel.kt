@@ -11,7 +11,11 @@ data class UiMessage(
     val role: String,
     val content: String,
     val isStreaming: Boolean = false,
-    val images: List<String> = emptyList()
+    val images: List<String> = emptyList(),
+    val id: String = System.nanoTime().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
+    val generationMs: Long = 0L,
+    val tokenEstimate: Int = 0
 )
 
 class ChatViewModel : ViewModel() {
@@ -40,6 +44,12 @@ class ChatViewModel : ViewModel() {
     val currentId: StateFlow<String?> = _currentId
 
     private var job: Job? = null
+    private val _generationMs = MutableStateFlow(0L)
+    val generationMs: StateFlow<Long> = _generationMs
+    private val _tokenEstimate = MutableStateFlow(0)
+    val tokenEstimate: StateFlow<Int> = _tokenEstimate
+    private val _recoverablePrompt = MutableStateFlow<String?>(null)
+    val recoverablePrompt: StateFlow<String?> = _recoverablePrompt
 
     fun init(settingsStore: SettingsStore, chatStore: ChatStore) {
         if (initialized) return
@@ -55,7 +65,8 @@ class ChatViewModel : ViewModel() {
             _sessions.value = loaded
             val first = loaded.firstOrNull { it.pinned } ?: loaded.firstOrNull()
             _currentId.value = first?.id
-            _messages.value = first?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
+            _messages.value = first?.messages?.map { UiMessage(it.role, it.content, images = it.images, id = it.id.ifBlank { System.nanoTime().toString() }, createdAt = it.createdAt, generationMs = it.generationMs, tokenEstimate = it.tokenEstimate) } ?: emptyList()
+            _recoverablePrompt.value = first?.pendingPrompt
         }
     }
 
@@ -66,7 +77,7 @@ class ChatViewModel : ViewModel() {
 
     private fun persistCurrentMessages() {
         val id = _currentId.value ?: return
-        val stored = _messages.value.filter { !it.isStreaming }.map { StoredMessage(it.role, it.content, it.images) }
+        val stored = _messages.value.filter { !it.isStreaming }.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate) }
         _sessions.value = _sessions.value.map {
             if (it.id == id) it.copy(updatedAt = System.currentTimeMillis(), messages = stored) else it
         }
@@ -103,6 +114,7 @@ class ChatViewModel : ViewModel() {
         _messages.value = _sessions.value.firstOrNull { it.id == id }
             ?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
         _error.value = null
+        _recoverablePrompt.value = _sessions.value.firstOrNull { it.id == id }?.pendingPrompt
     }
 
     fun renameChat(id: String, title: String) {
@@ -140,17 +152,17 @@ class ChatViewModel : ViewModel() {
         if (session == null) session = openSession(s.providerId, s.model)
         val sessionId = session.id
 
-        val user = UiMessage("user", text.trim(), images = images)
+        val user = UiMessage("user", text.trim(), images = images, tokenEstimate = estimateTokens(text))
         val history = _messages.value + user
 
-        val stored = history.map { StoredMessage(it.role, it.content, it.images) }
+        val stored = history.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate) }
         _sessions.value = _sessions.value.map {
             if (it.id == sessionId) {
                 val newTitle = if (it.title == "Новый чат") {
                     val t = text.trim()
                     t.take(40) + if (t.length > 40) "…" else ""
                 } else it.title
-                it.copy(title = newTitle, updatedAt = System.currentTimeMillis(), messages = stored)
+                it.copy(title = newTitle, updatedAt = System.currentTimeMillis(), messages = stored, pendingPrompt = text.trim())
             } else it
         }
         persist()
@@ -170,7 +182,10 @@ class ChatViewModel : ViewModel() {
 
     private fun startStream(history: List<UiMessage>) {
         val s = _settings.value
+        val startedAt = System.currentTimeMillis()
         _messages.value = history + UiMessage("assistant", "", isStreaming = true)
+        _generationMs.value = 0L
+        _tokenEstimate.value = history.sumOf { estimateTokens(it.content) }
         _busy.value = true
         _error.value = null
 
@@ -183,21 +198,76 @@ class ChatViewModel : ViewModel() {
                         is StreamEvent.Delta -> {
                             sb.append(ev.text)
                             _messages.value = _messages.value.dropLast(1) +
-                                UiMessage("assistant", sb.toString(), isStreaming = true)
+                                UiMessage("assistant", sb.toString(), isStreaming = true, generationMs = System.currentTimeMillis() - startedAt, tokenEstimate = estimateTokens(sb.toString()))
+                            _generationMs.value = System.currentTimeMillis() - startedAt
+                            _tokenEstimate.value = history.sumOf { estimateTokens(it.content) } + estimateTokens(sb.toString())
                         }
                         is StreamEvent.Failure -> _error.value = ev.message
                     }
                 }
             val final = sb.toString()
+            val elapsed = System.currentTimeMillis() - startedAt
+            _generationMs.value = elapsed
             _messages.value = if (final.isBlank() && _error.value != null) {
                 _messages.value.dropLast(1)
             } else {
-                _messages.value.dropLast(1) + UiMessage("assistant", final)
+                _messages.value.dropLast(1) + UiMessage("assistant", final, generationMs = elapsed, tokenEstimate = estimateTokens(final))
             }
             _busy.value = false
+            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null) else it }
+            _recoverablePrompt.value = null
             persistCurrentMessages()
         }
     }
+
+    fun editMessage(index: Int, replacement: String) {
+        if (_busy.value || replacement.isBlank() || index !in _messages.value.indices) return
+        val target = _messages.value[index]
+        if (target.role != "user") return
+        val history = _messages.value.take(index) + target.copy(content = replacement.trim(), createdAt = System.currentTimeMillis(), tokenEstimate = estimateTokens(replacement))
+        _messages.value = history
+        persistCurrentMessages()
+        startStream(history)
+    }
+
+    fun branchFrom(messageIndex: Int) {
+        if (_busy.value || messageIndex !in _messages.value.indices) return
+        val source = _sessions.value.firstOrNull { it.id == _currentId.value } ?: return
+        val prefix = _messages.value.take(messageIndex + 1)
+        val now = System.currentTimeMillis()
+        val branch = ChatSession(
+            id = "branch_${now}_${messageIndex}",
+            title = "Ветка: ${source.title}".take(40),
+            createdAt = now,
+            updatedAt = now,
+            providerId = source.providerId,
+            model = source.model,
+            messages = prefix.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate) },
+            parentSessionId = source.id,
+            branchMessageId = prefix.lastOrNull()?.id
+        )
+        _sessions.value = listOf(branch) + _sessions.value
+        _currentId.value = branch.id
+        _messages.value = prefix
+        persist()
+    }
+
+    fun recoverInterruptedRequest() {
+        val prompt = _recoverablePrompt.value ?: return
+        _recoverablePrompt.value = null
+        _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null) else it }
+        persist()
+        send(prompt)
+    }
+
+    fun searchInConversation(query: String): List<Int> {
+        if (query.isBlank()) return emptyList()
+        return _messages.value.mapIndexedNotNull { index, message ->
+            index.takeIf { message.content.contains(query, ignoreCase = true) }
+        }
+    }
+
+    private fun estimateTokens(text: String): Int = if (text.isBlank()) 0 else ((text.length + 3) / 4).coerceAtLeast(1)
 
     /** Переключить активного провайдера (ключ должен быть сохранён в настройках). */
     fun switchProvider(providerId: String) {
@@ -219,6 +289,8 @@ class ChatViewModel : ViewModel() {
         val last = list.lastOrNull()
         if (last?.isStreaming == true) {
             _messages.value = list.dropLast(1) + last.copy(isStreaming = false)
+            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = list.dropLast(1).lastOrNull { m -> m.role == "user" }?.content) else it }
+            _recoverablePrompt.value = _sessions.value.firstOrNull { it.id == _currentId.value }?.pendingPrompt
         }
         if (::chatStore.isInitialized) persistCurrentMessages()
     }
