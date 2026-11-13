@@ -39,6 +39,8 @@ class ChatViewModel {
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+    private val _apiStatus = MutableStateFlow("Не проверено")
+    val apiStatus: StateFlow<String> = _apiStatus
 
     private val _settings = MutableStateFlow(Settings("", "", "", ""))
     val settings: StateFlow<Settings> = _settings
@@ -202,19 +204,55 @@ class ChatViewModel {
                 addAll(history.map { ChatMessage(it.role, it.content, it.images) })
             }
             val sb = StringBuilder()
-            client.stream(Providers.byId(s.providerId), s.apiKey, s.baseUrl, s.model, apiMessages)
-                .collect { ev ->
+            val candidates = buildList {
+                add(Triple(Providers.byId(s.providerId), s.apiKey, Triple(s.model, s.baseUrl, false)))
+                Providers.all.filter { it.id != s.providerId && !s.savedKeys[it.id].isNullOrBlank() && !s.savedModels[it.id].isNullOrBlank() }
+                    .forEach { p -> add(Triple(p, s.savedKeys[p.id].orEmpty(), Triple(s.savedModels[p.id].orEmpty(), s.savedBaseUrls[p.id].orEmpty(), true))) }
+            }
+            var succeeded = false
+            var lastFailure: String? = null
+            for ((index, candidate) in candidates.withIndex()) {
+                val p = candidate.first
+                val key = candidate.second
+                val modelInfo = candidate.third
+                val modelId = modelInfo.first
+                val base = modelInfo.second
+                if (index > 0) _apiStatus.value = "Основной провайдер недоступен · пробую ${p.name}"
+                else _apiStatus.value = "Подключение к ${p.name}…"
+                val attemptText = StringBuilder()
+                var failure: String? = null
+                client.stream(p, key, base, modelId, apiMessages).collect { ev ->
                     when (ev) {
                         is StreamEvent.Delta -> {
-                            sb.append(ev.text)
+                            attemptText.append(ev.text)
                             _messages.value = _messages.value.dropLast(1) +
-                                UiMessage("assistant", sb.toString(), isStreaming = true, generationMs = System.currentTimeMillis() - startedAt, tokenEstimate = estimateTokens(sb.toString()))
+                                UiMessage("assistant", attemptText.toString(), isStreaming = true, generationMs = System.currentTimeMillis() - startedAt, tokenEstimate = estimateTokens(attemptText.toString()))
                             _generationMs.value = System.currentTimeMillis() - startedAt
-                            _tokenEstimate.value = history.sumOf { estimateTokens(it.content) } + estimateTokens(sb.toString())
+                            _tokenEstimate.value = history.sumOf { estimateTokens(it.content) } + estimateTokens(attemptText.toString())
                         }
-                        is StreamEvent.Failure -> _error.value = ev.message
+                        is StreamEvent.Failure -> failure = friendlyProviderError(ev.message)
                     }
                 }
+                if (failure == null && attemptText.isNotEmpty()) {
+                    sb.append(attemptText)
+                    succeeded = true
+                    _error.value = null
+                    _apiStatus.value = "Подключено · ${p.name}"
+                    if (index > 0) {
+                        store.setActiveProvider(p.id)
+                        store.saveModel(p.id, modelId)
+                    }
+                    break
+                }
+                lastFailure = failure ?: "Провайдер завершил запрос без ответа"
+                if (index < candidates.lastIndex) {
+                    _messages.value = history + UiMessage("assistant", "", isStreaming = true)
+                }
+            }
+            if (!succeeded) {
+                _error.value = lastFailure ?: "Не удалось подключиться к провайдеру"
+                _apiStatus.value = "Нет подключения к API"
+            }
             val final = sb.toString()
             val (visibleAnswer, fileResults) = withContext(Dispatchers.IO) {
                 applyWorkspaceWrites(s.workspacePath, final)
@@ -233,6 +271,19 @@ class ChatViewModel {
             _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null) else it }
             _recoverablePrompt.value = null
             persistCurrentMessages()
+        }
+    }
+
+    private fun friendlyProviderError(raw: String): String {
+        val lower = raw.lowercase()
+        return when {
+            "401" in lower || "unauthorized" in lower || "invalid api key" in lower -> "Неверный API-ключ. Проверь ключ в настройках провайдера."
+            "403" in lower || "forbidden" in lower -> "Доступ запрещён. Проверь права ключа и доступность модели."
+            "404" in lower -> "Модель или API-адрес не найдены. Проверь выбранную модель и Base URL."
+            "429" in lower || "rate limit" in lower || "quota" in lower -> "Превышен лимит запросов или исчерпана квота провайдера."
+            "timeout" in lower -> "Провайдер не ответил вовремя. Попробуй ещё раз."
+            "unable to resolve" in lower || "failed to connect" in lower || "network" in lower -> "Нет соединения с сервером провайдера. Проверь интернет."
+            else -> raw.take(320).ifBlank { "Неизвестная ошибка провайдера." }
         }
     }
 
