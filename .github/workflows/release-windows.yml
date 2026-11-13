@@ -1,4 +1,4 @@
-name: Release KeyStack 0.1.0 — Windows x64
+name: Release KeyStack 0.1.0 — All platforms
 
 on:
   push:
@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: keystack-release-v0.1.0
+  cancel-in-progress: false
 
 jobs:
   build-and-release:
@@ -39,19 +43,25 @@ jobs:
       - name: Publish Windows release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0-windows
+          tag_name: v0.1.0
           target_commitish: pc-version
-          name: KeyStack 0.1.0 — Windows x64
+          name: KeyStack 0.1.0
           draft: false
           prerelease: false
           generate_release_notes: true
           body: |
-            ## KeyStack 0.1.0 — Windows x64
-
-            Первая публичная сборка KeyStack для Windows x64.
-
-            **Файл:** MSI-установщик для 64-разрядной Windows.
-            **Установка:** скачайте MSI и запустите его, затем следуйте инструкциям установщика.
-
-            Для работы с нейросетями потребуется собственный API-ключ выбранного провайдера.
+            ## KeyStack 0.1.0
+            
+            Первая публичная версия KeyStack. В этом релизе собраны обе платформы.
+            
+            ### Загрузки
+            - **Android:** универсальный APK для Android-смартфонов — `app-release.apk`.
+            - **Windows x64:** установщик MSI для 64-разрядной Windows — `KeyStack-0.1.0.msi`.
+            
+            ### Установка
+            **Android:** скачайте APK на телефон, откройте его и подтвердите установку. При необходимости разрешите установку приложений из используемого источника.
+            
+            **Windows:** скачайте MSI и запустите установщик.
+            
+            Для работы с нейросетями потребуется собственный API-ключ выбранного провайдера. Условия доступа и оплаты определяет провайдер.
           files: desktop/build/compose/binaries/main/msi/*.msi
