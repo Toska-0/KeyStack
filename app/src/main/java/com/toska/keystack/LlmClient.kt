@@ -7,12 +7,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.add
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,6 +29,8 @@ sealed interface StreamEvent {
     data class Failure(val message: String) : StreamEvent
 }
 
+private data class ModelEntry(val id: String, val free: Boolean?)
+
 class LlmClient {
 
     private val client = OkHttpClient.Builder()
@@ -37,7 +40,10 @@ class LlmClient {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Загружает список моделей, доступных с этим ключом. */
+    /**
+     * Загружает список моделей, доступных с этим ключом.
+     * Для OpenRouter: если ключ бесплатного тарифа — остаются только бесплатные модели.
+     */
     suspend fun listModels(provider: Provider, apiKey: String, baseUrl: String): List<String> =
         withContext(Dispatchers.IO) {
             val effectiveBase = if (baseUrl.isNotBlank()) baseUrl.trimEnd('/') else provider.baseUrl
@@ -59,25 +65,61 @@ class LlmClient {
                     .get()
                     .build()
             }
-            val ids: List<String> = try {
+            val entries: List<ModelEntry> = try {
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) return@use emptyList()
                     val body = resp.body?.string() ?: return@use emptyList()
                     val obj = json.parseToJsonElement(body).jsonObject
                     when (provider.api) {
                         ApiKind.GEMINI -> obj["models"]?.jsonArray?.mapNotNull { m ->
-                            m.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.removePrefix("models/")
+                            val name = m.jsonObject["name"]?.jsonPrimitive?.contentOrNull
+                                ?.removePrefix("models/") ?: return@mapNotNull null
+                            ModelEntry(name, null)
                         } ?: emptyList()
+
                         else -> obj["data"]?.jsonArray?.mapNotNull { m ->
-                            m.jsonObject["id"]?.jsonPrimitive?.contentOrNull
+                            val o = m.jsonObject
+                            val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                            val pricing = o["pricing"]?.jsonObject
+                            val free = if (pricing != null) {
+                                val p = pricing["prompt"]?.jsonPrimitive?.contentOrNull
+                                val c = pricing["completion"]?.jsonPrimitive?.contentOrNull
+                                if (p != null && c != null) p == "0" && c == "0" else null
+                            } else null
+                            ModelEntry(id, free)
                         } ?: emptyList()
                     }
                 }
             } catch (e: Exception) {
                 emptyList()
             }
+
+            var ids = entries.map { it.id }
+            if (provider.id == "openrouter" && openRouterFreeTier(apiKey)) {
+                val freeOnly = entries.filter { it.free == true }.map { it.id }
+                if (freeOnly.isNotEmpty()) ids = freeOnly
+            }
             ids.sorted()
         }
+
+    /** Проверяет тариф ключа OpenRouter: true — бесплатный (is_free_tier). */
+    private suspend fun openRouterFreeTier(apiKey: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val req = Request.Builder()
+                .url("https://openrouter.ai/api/v1/auth/key")
+                .header("Authorization", "Bearer $apiKey")
+                .get()
+                .build()
+            client.newCall(req).execute().use { r ->
+                if (!r.isSuccessful) return@withContext false
+                val body = r.body?.string() ?: return@withContext false
+                val obj = json.parseToJsonElement(body).jsonObject
+                obj["data"]?.jsonObject?.get("is_free_tier")?.jsonPrimitive?.booleanOrNull ?: false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     fun stream(
         provider: Provider,
