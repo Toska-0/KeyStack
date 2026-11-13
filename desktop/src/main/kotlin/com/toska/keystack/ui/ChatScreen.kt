@@ -180,13 +180,12 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val provider = Providers.byId(settings.providerId)
     val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" && !it.isStreaming }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerContentColor = MaterialTheme.colorScheme.onSurface
-            ) {
+    Row(Modifier.fillMaxSize()) {
+        ModalDrawerSheet(
+            modifier = Modifier.width(264.dp),
+            drawerContainerColor = MaterialTheme.colorScheme.surface,
+            drawerContentColor = MaterialTheme.colorScheme.onSurface
+        ) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -259,17 +258,15 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 }
             }
         }
-    ) {
         Scaffold(
+            modifier = Modifier.weight(1f),
             topBar = {
                 TopAppBar(
                     colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background
                     ),
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Список чатов")
-                        }
+                        Spacer(Modifier.width(12.dp))
                     },
                     title = {
                         // Тап по заголовку — смена провайдера/модели прямо в чате
