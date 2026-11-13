@@ -22,8 +22,12 @@ import com.toska.keystack.ui.ChatScreen
 import com.toska.keystack.ui.SetupScreen
 import com.toska.keystack.ui.theme.KeyStackTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.io.File
+import java.awt.Frame
+import java.awt.Window as AwtWindow
 import com.sun.jna.Memory
+import com.sun.jna.Native
 import com.sun.jna.NativeLibrary
 
 fun main() = application {
@@ -35,14 +39,19 @@ fun main() = application {
         title = "KeyStack",
         state = rememberWindowState(width = 1280.dp, height = 832.dp)
     ) {
-        val systemDark = isSystemInDarkTheme()
-        SideEffect { applyWindowsTitleBarTheme(systemDark) }
-        AppRoot(dataDir)
+        var systemDark by remember { mutableStateOf(readWindowsDarkMode() ?: isSystemInDarkTheme()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                systemDark = readWindowsDarkMode() ?: isSystemInDarkTheme()
+                delay(2000)
+            }
+        }
+        AppRoot(dataDir, systemDark)
     }
 }
 
 @Composable
-fun AppRoot(dataDir: File) {
+fun AppRoot(dataDir: File, systemDark: Boolean) {
     val settingsStore = remember { SettingsStore(dataDir) }
     val chatStore = remember { ChatStore(dataDir) }
     val vm = remember { ChatViewModel() }
@@ -61,6 +70,13 @@ fun AppRoot(dataDir: File) {
             showSetup = false
         }
     }
+
+    val windowDark = when (settings.themeMode) {
+        "light" -> false
+        "dark", "amoled" -> true
+        else -> systemDark
+    }
+    SideEffect { applyWindowsTitleBarTheme(windowDark) }
 
     KeyStackTheme(themeMode = settings.themeMode) {
         if (showSetup) {
@@ -90,12 +106,33 @@ fun AppRoot(dataDir: File) {
 }
 
 
+private fun readWindowsDarkMode(): Boolean? {
+    if (!System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)) return null
+    return runCatching {
+        val process = ProcessBuilder(
+            "reg", "query",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            "/v", "AppsUseLightTheme"
+        ).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        if (process.waitFor() != 0) return@runCatching null
+        val value = Regex("AppsUseLightTheme\\s+REG_DWORD\\s+0x([0-9a-fA-F]+)")
+            .find(output)?.groupValues?.get(1)?.toInt(16) ?: return@runCatching null
+        value == 0
+    }.getOrNull()
+}
+
 private fun applyWindowsTitleBarTheme(dark: Boolean) {
     if (!System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)) return
     runCatching {
-        val hwnd = NativeLibrary.getInstance("user32")
-            .getFunction("GetForegroundWindow")
-            .invokePointer(emptyArray())
+        // Use the actual KeyStack AWT window handle, not whichever window happens to be foreground.
+        val frame = AwtWindow.getWindows()
+            .filterIsInstance<Frame>()
+            .firstOrNull { it.isDisplayable && it.title == "KeyStack" }
+            ?: AwtWindow.getWindows().filterIsInstance<Frame>()
+                .firstOrNull { it.isDisplayable && it.isActive }
+            ?: return
+        val hwnd = Native.getComponentPointer(frame)
         if (hwnd == null) return
         val value = Memory(4).apply { setInt(0, if (dark) 1 else 0) }
         val dwm = NativeLibrary.getInstance("dwmapi").getFunction("DwmSetWindowAttribute")
