@@ -925,7 +925,7 @@ fun MessageBubble(
                     SelectionContainer {
                         Text(
                             msg.content + if (msg.isStreaming) " ▌" else "",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (16f * fontScale).sp, lineHeight = (24f * fontScale).sp)
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * fontScale)
                         )
                     }
                 }
