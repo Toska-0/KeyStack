@@ -122,6 +122,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
     var chatSearch by remember { mutableStateOf("") }
+    var workspaceMode by remember { mutableStateOf("Работа") }
     val listState = rememberLazyListState()
 
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
@@ -219,6 +220,33 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         Icon(Icons.Default.Add, contentDescription = "Новый чат")
                     }
                 }
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                        .background(Color(0xFF101012), RoundedCornerShape(9.dp)).padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    listOf("Работа", "Код").forEach { mode ->
+                        Surface(
+                            modifier = Modifier.weight(1f).clickable { workspaceMode = mode },
+                            color = if (workspaceMode == mode) Color(0xFF303034) else Color.Transparent,
+                            shape = RoundedCornerShape(7.dp)
+                        ) {
+                            Text(mode, modifier = Modifier.padding(vertical = 8.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = if (workspaceMode == mode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+                SidebarNavItem("▦", "Приложения", "Preview")
+                SidebarNavItem("✣", "Контекст")
+                SidebarNavItem("◷", "Расписание")
+                Text("ПРОЕКТЫ", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 18.dp, top = 18.dp, bottom = 7.dp))
+                Text("НЕДАВНИЕ", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 18.dp, top = 8.dp, bottom = 7.dp))
                 Text(
                     "ИСТОРИЯ",
                     style = MaterialTheme.typography.labelSmall,
@@ -594,78 +622,62 @@ private fun VibeWelcomePanel(
     providerName: String,
     onPrompt: (String) -> Unit
 ) {
-    val prompts = listOf(
-        listOf("01", "Исследовать идею", "Разложи сложную тему на понятные шаги", "Разложи сложную тему на понятные шаги"),
-        listOf("02", "Работа с файлами", "Изучи документ и выдели главное", "Проанализируй прикреплённый файл и сделай краткое резюме"),
-        listOf("03", "План проекта", "От идеи до готового результата", "Помоги составить подробный план моего проекта")
-    )
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 28.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(8.dp), modifier = Modifier.size(34.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("K", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("KEYSTACK WORKSPACE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Пространство для идей и работы", style = MaterialTheme.typography.titleSmall)
-                }
-            }
-            Spacer(Modifier.height(42.dp))
-            Text(
-                "С чего начнём?",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.height(9.dp))
-            Text(
-                "Задайте вопрос, исследуйте идею или начните новую задачу.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(50.dp)) {
-                Text(
-                    "●  $providerName  /  готов к работе",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
-                )
-            }
-            Spacer(Modifier.height(28.dp))
-            Text("БЫСТРЫЙ СТАРТ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                prompts.forEach { (number, title, subtitle, prompt) ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { onPrompt(prompt) },
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        shape = RoundedCornerShape(15.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.28f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 17.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(number, color = Color(0xFFFF5A1F), style = MaterialTheme.typography.labelLarge)
-                            Spacer(Modifier.width(16.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(title, style = MaterialTheme.typography.titleSmall)
-                                Spacer(Modifier.height(3.dp))
-                                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text("↗", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                }
+        Surface(color = Color.Transparent, modifier = Modifier.size(42.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("K", color = Color(0xFFFF5A1F), style = MaterialTheme.typography.displaySmall)
             }
         }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Добро пожаловать. С чего начнём?",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Задайте вопрос, начните проект или прикрепите файл.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Spacer(Modifier.height(18.dp))
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(50.dp)) {
+            Text(
+                "●  $providerName  ·  готов к работе",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp)
+            )
+        }
+        Spacer(Modifier.height(22.dp))
+        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+            Text("✦   Настроить и изучить возможности KeyStack", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Расскажи, как эффективнее работать с KeyStack") })
+            Text("◉   Узнать о возможностях выбранной модели", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Расскажи о возможностях выбранной модели") })
+            Text("⌘   Проанализировать документ или файл", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Помоги проанализировать прикреплённый файл") })
+            Text("···   Посмотреть другие возможности", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Какие задачи ты можешь выполнить?") })
+        }
+    }
+}
+
+@Composable
+private fun SidebarNavItem(symbol: String, label: String, tag: String? = null) {
+    Row(Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(symbol, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.width(12.dp))
+        Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f))
+        if (tag != null) Text(tag, color = Color(0xFF54B6FF), style = MaterialTheme.typography.labelSmall)
     }
 }
 
