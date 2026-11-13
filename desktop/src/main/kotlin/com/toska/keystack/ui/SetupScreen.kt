@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.Settings
+import javax.swing.JFileChooser
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +62,7 @@ fun SetupScreen(
     initial: Settings,
     onDone: (providerId: String, apiKey: String, model: String, baseUrl: String) -> Unit,
     onSaveTheme: (themeMode: String, dynamicColor: Boolean) -> Unit,
+    onSaveWorkspace: (path: String) -> Unit,
     onBack: (() -> Unit)? = null
 ) {
     var selectedId by remember { mutableStateOf(initial.providerId.ifBlank { Providers.all.first().id }) }
@@ -72,6 +74,7 @@ fun SetupScreen(
     var search by remember { mutableStateOf("") }
 
     var themeMode by remember { mutableStateOf(initial.themeMode) }
+    var workspacePath by remember { mutableStateOf(initial.workspacePath) }
 
     // Черновики полей по провайдерам — чтобы ввод не терялся при переключении
     val draftKeys = remember { mutableStateMapOf<String, String>() }
@@ -306,6 +309,40 @@ fun SetupScreen(
                         }
                     )
                     Text(label, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+
+            Text("Рабочая папка ИИ", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "KeyStack сможет читать текстовые файлы из этой папки и создавать или обновлять файлы по запросу. Доступ ограничен выбранной папкой.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            OutlinedTextField(
+                value = workspacePath,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Путь к рабочей папке") },
+                placeholder = { Text("Папка не выбрана") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    val chooser = JFileChooser().apply {
+                        dialogTitle = "Выберите рабочую папку KeyStack"
+                        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                        isAcceptAllFileFilterUsed = false
+                        if (workspacePath.isNotBlank()) currentDirectory = java.io.File(workspacePath)
+                    }
+                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                        workspacePath = chooser.selectedFile.absolutePath
+                        onSaveWorkspace(workspacePath)
+                    }
+                }) { Text(if (workspacePath.isBlank()) "Выбрать папку" else "Изменить папку") }
+                if (workspacePath.isNotBlank()) {
+                    TextButton(onClick = {
+                        workspacePath = ""
+                        onSaveWorkspace("")
+                    }) { Text("Отключить") }
                 }
             }
 
