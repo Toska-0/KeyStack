@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -72,6 +73,7 @@ fun SetupScreen(
     onSaveTheme: (themeMode: String, dynamicColor: Boolean) -> Unit,
     onSaveWorkspace: (path: String) -> Unit,
     onSaveUiPreferences: (fontScale: Float, messageWidth: Int, animationsEnabled: Boolean) -> Unit,
+    onSaveAccentColor: (String) -> Unit,
     onBack: (() -> Unit)? = null
 ) {
     var selectedId by remember { mutableStateOf(initial.providerId.ifBlank { Providers.all.first().id }) }
@@ -87,6 +89,7 @@ fun SetupScreen(
     var fontScale by remember { mutableStateOf(initial.fontScale) }
     var messageWidth by remember { mutableStateOf(initial.messageWidth.toFloat()) }
     var animationsEnabled by remember { mutableStateOf(initial.animationsEnabled) }
+    var accentColor by remember { mutableStateOf(initial.accentColor) }
 
     // Черновики полей по провайдерам — чтобы ввод не терялся при переключении
     val draftKeys = remember { mutableStateMapOf<String, String>() }
@@ -338,6 +341,15 @@ fun SetupScreen(
                 }
             }
 
+            Text("Акцентный цвет", style = MaterialTheme.typography.titleMedium)
+            Text("Цвет кнопок, выделений и активных элементов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf("orange" to Color(0xFFFF5A1F), "blue" to Color(0xFF4D8DFF), "purple" to Color(0xFF9B72E8), "green" to Color(0xFF35A879), "pink" to Color(0xFFE65B91), "cyan" to Color(0xFF20AFC2)).forEach { (id, color) ->
+                    Box(Modifier.size(34.dp).background(color, CircleShape).clickable { accentColor = id; onSaveAccentColor(id) }, contentAlignment = Alignment.Center) {
+                        if (accentColor == id) Icon(Icons.Default.Check, contentDescription = "Выбран", tint = Color.White)
+                    }
+                }
+            }
             Text("Интерфейс чата", style = MaterialTheme.typography.titleMedium)
             Text("Размер текста: ${(fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
             Slider(value = fontScale, onValueChange = {
