@@ -373,26 +373,23 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     .padding(padding)
                     .imePadding()
             ) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(7.dp).background(if (quota != null || (settings.providerId != "openrouter" && settings.apiKey.isNotBlank())) Color(0xFF45B879) else Color(0xFFB58A45), CircleShape))
-                    Spacer(Modifier.width(7.dp))
-                    Text(if (settings.providerId == "openrouter") quotaStatus else apiStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).background(if (quota != null || (settings.providerId != "openrouter" && settings.apiKey.isNotBlank())) Color(0xFF45B879) else Color(0xFFB58A45), CircleShape))
+                        Spacer(Modifier.width(7.dp))
+                        Text(if (settings.providerId == "openrouter") quotaStatus else apiStatus, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     if (modelContextLimit != null) {
                         val contextFraction = (estimatedContextTokens.toFloat() / modelContextLimit!!.coerceAtLeast(1)).coerceIn(0f, 1f)
                         Text("Контекст ≈ " + estimatedContextTokens + " / " + modelContextLimit + " токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(8.dp))
-                        Box(Modifier.width(76.dp)) { LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth()) }
-                    } else {
-                        Text("Лимит контекста не опубликован API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                        LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth())
+                    } else Text("Лимит контекста не опубликован API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (settings.providerId == "openrouter" && quota != null) {
                         val q = quota!!
                         val fraction = if (q.second > 0) (q.first / q.second).toFloat().coerceIn(0f, 1f) else 0f
-                        Text("$" + "%.2f".format((q.second - q.first).coerceAtLeast(0.0)) + " осталось из $" + "%.2f".format(q.second), style = MaterialTheme.typography.labelSmall)
-                        Spacer(Modifier.width(8.dp))
-                        Box(Modifier.width(80.dp)) { LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth()) }
-                    } else Text(if (settings.providerId == "openrouter") "Квота недоступна" else "Лимит не раскрывается API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Квота ключа: $" + "%.2f".format((q.second - q.first).coerceAtLeast(0.0)) + " осталось из $" + "%.2f".format(q.second), style = MaterialTheme.typography.labelSmall)
+                        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                    } else if (settings.providerId == "openrouter") Text("Квота ключа недоступна", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (messages.isNotEmpty()) {
                 OutlinedTextField(
