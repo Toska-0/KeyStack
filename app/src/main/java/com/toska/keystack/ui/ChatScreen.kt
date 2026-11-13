@@ -389,7 +389,10 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             msg = msg,
                             isLastAssistant = idx == lastAssistantIdx,
                             busy = busy,
-                            onRegenerate = { vm.regenerate() }
+                            onRegenerate = { vm.regenerate() },
+                            fontScale = settings.fontScale,
+                            maxWidth = settings.messageWidth,
+                            animationsEnabled = settings.animationsEnabled
                         )
                     }
                     }
@@ -840,7 +843,10 @@ fun MessageBubble(
     busy: Boolean = false,
     onRegenerate: () -> Unit = {},
     onEdit: () -> Unit = {},
-    onBranch: () -> Unit = {}
+    onBranch: () -> Unit = {},
+    fontScale: Float = 1f,
+    maxWidth: Int = 760,
+    animationsEnabled: Boolean = true
 ) {
     val isUser = msg.role == "user"
     val clipboard = LocalClipboardManager.current
@@ -864,7 +870,7 @@ fun MessageBubble(
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
             } else {
-                Column(Modifier.padding(if (isUser) 14.dp else 4.dp).widthIn(max = 760.dp)) {
+                Column(Modifier.padding(if (isUser) 14.dp else 4.dp).widthIn(max = maxWidth.dp)) {
                     if (isUser && msg.images.isNotEmpty()) {
                         Text(
                             "📷 Фото: ${msg.images.size}",
@@ -874,23 +880,10 @@ fun MessageBubble(
                     }
                     SelectionContainer {
                         Text(
-                            msg.content + if (msg.isStreaming) " ▌" else ""
+                            msg.content + if (msg.isStreaming) " ▌" else "",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (16f * fontScale).sp, lineHeight = (24f * fontScale).sp)
                         )
                     }
-                }
-            }
-        }
-        if (isUser && !msg.isStreaming) {
-            Row {
-                TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = "Изменить", modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Изменить", style = MaterialTheme.typography.labelMedium)
-                }
-                TextButton(onClick = onBranch, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Text("↳", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Ветка", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
