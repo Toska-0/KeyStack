@@ -8,6 +8,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class UiMessage(
     val role: String,
@@ -179,8 +180,12 @@ class ChatViewModel {
         _busy.value = true
         _error.value = null
 
-        val apiMessages = history.map { ChatMessage(it.role, it.content, it.images) }
         job = scope.launch {
+            val workspacePrompt = withContext(Dispatchers.IO) { buildWorkspacePrompt(s.workspacePath) }
+            val apiMessages = buildList {
+                if (workspacePrompt.isNotBlank()) add(ChatMessage("system", workspacePrompt))
+                addAll(history.map { ChatMessage(it.role, it.content, it.images) })
+            }
             val sb = StringBuilder()
             client.stream(Providers.byId(s.providerId), s.apiKey, s.baseUrl, s.model, apiMessages)
                 .collect { ev ->
