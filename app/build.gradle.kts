@@ -5,6 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Стабильный keystore для одинаковой подписи между сборками (обновления ставятся поверх)
+val keystoreFile = rootProject.file("debug.keystore")
+
 android {
     namespace = "com.toska.keystack"
     compileSdk = 35
@@ -13,14 +16,33 @@ android {
         applicationId = "com.toska.keystack"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
+    }
+
+    signingConfigs {
+        if (keystoreFile.exists()) {
+            create("ci") {
+                storeFile = keystoreFile
+                storePassword = "android"
+                keyAlias = "keystack"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("ci")
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("ci")
+            }
         }
     }
     compileOptions {
