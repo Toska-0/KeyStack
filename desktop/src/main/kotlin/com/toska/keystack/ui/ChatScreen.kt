@@ -819,7 +819,9 @@ fun MessageBubble(
     msg: UiMessage,
     isLastAssistant: Boolean = false,
     busy: Boolean = false,
-    onRegenerate: () -> Unit = {}
+    onRegenerate: () -> Unit = {},
+    onEdit: () -> Unit = {},
+    onBranch: () -> Unit = {}
 ) {
     val isUser = msg.role == "user"
     val clipboard = LocalClipboardManager.current
