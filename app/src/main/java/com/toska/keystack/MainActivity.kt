@@ -55,6 +55,9 @@ class MainActivity : ComponentActivity() {
                         onSaveTheme = { mode, dyn ->
                             scope.launch { settingsStore.saveTheme(mode, dyn) }
                         },
+                        onSaveUiPreferences = { fontScale, messageWidth, animationsEnabled ->
+                            scope.launch { settingsStore.saveUiPreferences(fontScale, messageWidth, animationsEnabled) }
+                        },
                         onBack = if (settings.providerId.isNotBlank() && settings.apiKey.isNotBlank()) {
                             { showSetup = false }
                         } else null
