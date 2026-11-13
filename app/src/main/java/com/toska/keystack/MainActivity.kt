@@ -43,7 +43,8 @@ class MainActivity : ComponentActivity() {
 
             KeyStackTheme(
                 themeMode = settings.themeMode,
-                dynamicColor = settings.dynamicColor
+                dynamicColor = settings.dynamicColor,
+                accentColor = settings.accentColor
             ) {
                 if (showSetup) {
                     SetupScreen(
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
                         onSaveTheme = { mode, dyn ->
                             scope.launch { settingsStore.saveTheme(mode, dyn) }
                         },
+                        onSaveAccentColor = { color -> scope.launch { settingsStore.saveAccentColor(color) } },
                         onSaveUiPreferences = { fontScale, messageWidth, animationsEnabled ->
                             scope.launch { settingsStore.saveUiPreferences(fontScale, messageWidth, animationsEnabled) }
                         },
