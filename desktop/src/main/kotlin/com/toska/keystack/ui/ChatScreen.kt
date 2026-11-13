@@ -86,7 +86,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.awt.LocalWindow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -233,9 +232,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     var attachMenu by remember { mutableStateOf(false) }
     var loadingAttachments by remember { mutableStateOf(false) }
     var recentPickerOpen by remember { mutableStateOf(false) }
-    var recentPickerOpen by remember { mutableStateOf(false) }
     var recentAttachmentPaths by remember { mutableStateOf(emptyList<String>()) }
-    val awtWindow = LocalWindow.current
+    val awtWindow = remember { java.awt.Window.getWindows().firstOrNull { it.isDisplayable } }
     fun saveRecentAttachmentPaths(paths: List<String>) {
         recentAttachmentPaths = (paths + recentAttachmentPaths).filter { it.isNotBlank() }.distinct().take(12)
         runCatching { val history = File(System.getProperty("user.home"), ".keystack/attachment-history.txt"); history.parentFile?.mkdirs(); history.writeText(recentAttachmentPaths.joinToString("\n")) }
@@ -245,26 +243,30 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         recentAttachmentPaths = runCatching { if (history.exists()) history.readLines().filter { File(it).exists() }.take(12) else emptyList() }.getOrDefault(emptyList())
     }
     DisposableEffect(awtWindow) {
-        val previousTarget = awtWindow.dropTarget
-        awtWindow.dropTarget = DropTarget(awtWindow, DnDConstants.ACTION_COPY, object : DropTargetAdapter() {
-            override fun drop(event: DropTargetDropEvent) {
-                try {
-                    event.acceptDrop(DnDConstants.ACTION_COPY)
-                    @Suppress("UNCHECKED_CAST")
-                    val files = event.transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<File>
-                    scope.launch {
-                        loadingAttachments = true
-                        val batch = readDroppedFiles(files)
-                        pendingImages = (pendingImages + batch.first).distinct().take(4)
-                        pendingFiles = (pendingFiles + batch.second).distinctBy { it.path.ifBlank { it.name } }
-                        saveRecentAttachmentPaths(files.map { it.absolutePath })
-                        loadingAttachments = false
-                    }
-                    event.dropComplete(true)
-                } catch (_: Exception) { event.dropComplete(false) }
-            }
-        }, true)
-        onDispose { awtWindow.dropTarget = previousTarget }
+        if (awtWindow == null) {
+            onDispose { }
+        } else {
+            val previousTarget = awtWindow.dropTarget
+            awtWindow.dropTarget = DropTarget(awtWindow, DnDConstants.ACTION_COPY, object : DropTargetAdapter() {
+                override fun drop(event: DropTargetDropEvent) {
+                    try {
+                        event.acceptDrop(DnDConstants.ACTION_COPY)
+                        @Suppress("UNCHECKED_CAST")
+                        val files = event.transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<File>
+                        scope.launch {
+                            loadingAttachments = true
+                            val batch = readDroppedFiles(files)
+                            pendingImages = (pendingImages + batch.first).distinct().take(4)
+                            pendingFiles = (pendingFiles + batch.second).distinctBy { it.path.ifBlank { it.name } }
+                            saveRecentAttachmentPaths(files.map { it.absolutePath })
+                            loadingAttachments = false
+                        }
+                        event.dropComplete(true)
+                    } catch (_: Exception) { event.dropComplete(false) }
+                }
+            }, true)
+            onDispose { awtWindow.dropTarget = previousTarget }
+        }
     }
 
     // Переключатель провайдера/модели
