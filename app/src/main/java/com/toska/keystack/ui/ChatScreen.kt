@@ -388,7 +388,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     }
                     if (settings.providerId == "openrouter" && quota != null) {
                         val q = quota!!
-                        val fraction = if (q.limit > 0) (q.first / q.second).toFloat().coerceIn(0f, 1f) else 0f
+                        val fraction = if (q.second > 0) (q.first / q.second).toFloat().coerceIn(0f, 1f) else 0f
                         Text("$" + "%.2f".format((q.second - q.first).coerceAtLeast(0.0)) + " осталось из $" + "%.2f".format(q.second), style = MaterialTheme.typography.labelSmall)
                         Spacer(Modifier.width(8.dp))
                         Box(Modifier.width(80.dp)) { LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth()) }
