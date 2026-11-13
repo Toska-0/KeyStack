@@ -409,7 +409,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.width(76.dp)) { LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth()) }
                 } else {
-                    Text("Лимит контекста не опубликован API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Лимит не раскрывается API · использовано ≈ $estimatedContextTokens токенов · использовано ≈ $estimatedContextTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (settings.providerId == "openrouter" && quota != null) {
                     val q = quota!!
@@ -1066,14 +1066,18 @@ fun MessageBubble(
                 }
             }
         }
-        if (!isUser && !msg.isStreaming && msg.content.isNotBlank()) {
+        if (!isUser && (msg.isStreaming || msg.content.isNotBlank())) {
             Row(
-                modifier = Modifier.padding(start = 8.dp, top = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
+                horizontalArrangement = Arrangement.End,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (msg.generationMs > 0L) Text("${"%.1f".format(msg.generationMs / 1000.0)} с", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (msg.isStreaming && msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов · генерируется", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                else {
+                    if (msg.generationMs > 0L) Text("${"%.1f".format(msg.generationMs / 1000.0)} с", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         // Кнопки под ответом ИИ: копировать и перегенерировать
