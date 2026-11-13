@@ -117,6 +117,7 @@ suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
         dialogTitle = "Выберите картинки"
         setMultiSelectionEnabled(true)
         fileFilter = FileNameExtensionFilter("Изображения (jpg, png, webp, gif)", "jpg", "jpeg", "png", "webp", "gif")
+        isAcceptAllFileFilterUsed = false
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
     withContext(Dispatchers.IO) {
@@ -143,6 +144,7 @@ suspend fun pickDocuments(): List<PendingFile> = withContext(Dispatchers.Swing) 
         dialogTitle = "Прикрепить документ или файл с текстом"
         setMultiSelectionEnabled(true)
         fileFilter = FileNameExtensionFilter("Документы и исходный код", *extensions)
+        isAcceptAllFileFilterUsed = false
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
     withContext(Dispatchers.IO) {
@@ -313,7 +315,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         onDismissAttach = { attachMenu = false },
                         onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
                         onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickDocuments()).distinctBy { it.name } } },
-                        enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
+                        enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty() || pendingFiles.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
                         Text(
@@ -383,7 +385,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
                             onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
                             onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickDocuments()).distinctBy { it.name } } },
-                            enabled = input.isNotBlank() || pendingImages.isNotEmpty()
+                            enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
                         )
                     }
                 }
@@ -568,7 +570,7 @@ private fun ComposerBar(
             }
             DropdownMenu(expanded = attachMenu, onDismissRequest = onDismissAttach) {
                 DropdownMenuItem(text = { Text("Фото / картинка") }, onClick = { onDismissAttach(); onPickImages() })
-                DropdownMenuItem(text = { Text("Документ или исходный файл") }, onClick = { onDismissAttach(); onPickFiles() })
+                DropdownMenuItem(text = { Text("Файл") }, onClick = { onDismissAttach(); onPickFiles() })
             }
         }
         OutlinedTextField(
