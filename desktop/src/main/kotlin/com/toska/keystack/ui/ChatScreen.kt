@@ -211,24 +211,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
                 }
                 Spacer(Modifier.width(9.dp))
-                Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF4F4F5), modifier = Modifier.weight(1f))
-                Text("⌕", color = Color(0xFFB8B8BD), modifier = Modifier.clickable { chatSearch = if (chatSearch.isBlank()) " " else "" }.padding(horizontal = 5.dp))
-                Text("◫", color = Color(0xFFB8B8BD), modifier = Modifier.padding(start = 5.dp))
-            }
-            Row(
-                Modifier.fillMaxWidth().background(Color(0xFF0D0D0F), RoundedCornerShape(8.dp)).padding(3.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                listOf("Работа", "Код").forEach { mode ->
-                    Surface(
-                        modifier = Modifier.weight(1f).clickable { workspaceMode = mode },
-                        color = if (workspaceMode == mode) Color(0xFF29292D) else Color.Transparent,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(mode, modifier = Modifier.padding(vertical = 7.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            style = MaterialTheme.typography.labelLarge, color = if (workspaceMode == mode) Color.White else Color(0xFFB9B9BE))
-                    }
-                }
+                Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF4F4F5))
             }
             Spacer(Modifier.height(9.dp))
             Surface(
@@ -244,27 +227,22 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(7.dp))
-            SidebarNavItem("▦", "Приложения", "Preview")
-            SidebarNavItem("✣", "Контекст")
-            SidebarNavItem("◷", "Расписание")
-            Spacer(Modifier.height(20.dp))
-            Text("Проекты", color = Color(0xFF9A9AA1), style = MaterialTheme.typography.labelSmall,
+                        Spacer(Modifier.height(18.dp))
+            Text("НЕДАВНИЕ ЧАТЫ", color = Color(0xFF9A9AA1), style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(start = 8.dp, bottom = 9.dp))
-            Text("Недавние", color = Color(0xFF9A9AA1), style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 8.dp, bottom = 7.dp))
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                val sorted = sessions.sortedWith(compareByDescending<ChatSession> { it.pinned }.thenByDescending { it.updatedAt })
-                    .filter { it.title.contains(chatSearch.trim(), ignoreCase = true) }
-                items(sorted, key = { it.id }) { session ->
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                // Сортировка по времени создания не перемещает чат после каждого нового сообщения.
+                val stableSessions = sessions.sortedByDescending { it.createdAt }
+                items(stableSessions, key = { it.id }) { session ->
                     Row(
-                        Modifier.fillMaxWidth()
+                        Modifier.fillMaxWidth().height(36.dp)
                             .background(if (session.id == currentId) Color(0xFF33261D) else Color.Transparent, RoundedCornerShape(7.dp))
                             .clickable { vm.selectChat(session.id) }
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                            .padding(horizontal = 9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(session.title, color = Color(0xFFE3E3E6), style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
