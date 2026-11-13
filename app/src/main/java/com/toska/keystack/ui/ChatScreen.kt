@@ -124,6 +124,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
+    var messageSearch by remember { mutableStateOf("") }
     var editMessageTarget by remember { mutableStateOf<Int?>(null) }
     var editMessageText by remember { mutableStateOf("") }
     var chatSearch by remember { mutableStateOf("") }
@@ -349,7 +350,28 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     .padding(padding)
                     .imePadding()
             ) {
-                if (messages.isEmpty()) {
+                if (messages.isNotEmpty()) {
+                OutlinedTextField(
+                    value = messageSearch,
+                    onValueChange = { messageSearch = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                    singleLine = true,
+                    placeholder = { Text("Поиск в переписке") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (messageSearch.isNotBlank()) TextButton(onClick = { messageSearch = "" }) { Text("Очистить") }
+                    }
+                )
+                if (messageSearch.isNotBlank()) {
+                    Text(
+                        "Найдено сообщений: ${vm.searchInConversation(messageSearch).size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            if (messages.isEmpty()) {
                     VibeWelcomePanel(
                         providerName = provider.name,
                         onPrompt = { input = it }
@@ -867,6 +889,16 @@ fun MessageBubble(
                     Spacer(Modifier.width(4.dp))
                     Text("Ветка", style = MaterialTheme.typography.labelMedium)
                 }
+            }
+        }
+        if (!isUser && !msg.isStreaming && msg.content.isNotBlank()) {
+            Row(
+                modifier = Modifier.padding(start = 8.dp, top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (msg.generationMs > 0L) Text("${"%.1f".format(msg.generationMs / 1000.0)} с", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         // Кнопки под ответом ИИ: копировать и перегенерировать
