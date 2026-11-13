@@ -264,13 +264,14 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             Column(
                 Modifier
                     .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(padding)
             ) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     itemsIndexed(messages) { idx, msg ->
                         MessageBubble(
@@ -321,7 +322,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     // Плюс — прикрепить фото или файл
@@ -364,13 +365,13 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Сообщение…") },
                         maxLines = 5,
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                             cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         )
@@ -630,9 +631,8 @@ fun MessageBubble(
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         Surface(
-            color = if (isUser) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(16.dp)
+            color = if (isUser) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            shape = RoundedCornerShape(22.dp)
         ) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
