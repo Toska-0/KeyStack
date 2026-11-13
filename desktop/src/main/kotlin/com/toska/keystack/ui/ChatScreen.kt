@@ -312,11 +312,22 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         attachMenu = attachMenu,
                         onDismissAttach = { attachMenu = false },
                         onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
-                        onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickTextFiles()).distinctBy { it.name } } },
-                        enabled = input.isNotBlank() || pendingImages.isNotEmpty()
+                        onPickFiles = { scope.launch { pendingFiles = (pendingFiles + pickDocuments()).distinctBy { it.name } } },
+                        enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
-                        Text("Вложения: ${pendingImages.size + pendingFiles.size}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            buildString {
+                                append("Прикреплено: ")
+                                if (pendingImages.isNotEmpty()) append("изображений — ${pendingImages.size}")
+                                if (pendingImages.isNotEmpty() && pendingFiles.isNotEmpty()) append(" · ")
+                                if (pendingFiles.isNotEmpty()) append(pendingFiles.joinToString { it.name })
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                     Spacer(Modifier.height(18.dp))
                     Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -342,6 +353,21 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     error?.let { err ->
                         Text("Ошибка: $err", color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                    }
+                    if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
+                        Text(
+                            buildString {
+                                append("Прикреплено: ")
+                                if (pendingImages.isNotEmpty()) append("изображений — ${pendingImages.size}")
+                                if (pendingImages.isNotEmpty() && pendingFiles.isNotEmpty()) append(" · ")
+                                if (pendingFiles.isNotEmpty()) append(pendingFiles.joinToString { it.name })
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 4.dp)
+                        )
                     }
                     Box(
                         Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp),
@@ -558,7 +584,7 @@ private fun ComposerBar(
             }
             DropdownMenu(expanded = attachMenu, onDismissRequest = onDismissAttach) {
                 DropdownMenuItem(text = { Text("Фото / картинка") }, onClick = { onDismissAttach(); onPickImages() })
-                DropdownMenuItem(text = { Text("Файл (текст)") }, onClick = { onDismissAttach(); onPickFiles() })
+                DropdownMenuItem(text = { Text("Документ или исходный файл") }, onClick = { onDismissAttach(); onPickFiles() })
             }
         }
         OutlinedTextField(
