@@ -232,6 +232,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     var attachMenu by remember { mutableStateOf(false) }
     var loadingAttachments by remember { mutableStateOf(false) }
     var recentPickerOpen by remember { mutableStateOf(false) }
+    var recentPickerOpen by remember { mutableStateOf(false) }
     var recentAttachmentPaths by remember { mutableStateOf(emptyList<String>()) }
     val awtWindow = LocalWindow.current
     fun saveRecentAttachmentPaths(paths: List<String>) {
@@ -465,6 +466,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         onPickFiles = { scope.launch { loadingAttachments = true; val picked = pickDocuments(); pendingFiles = (pendingFiles + picked).distinctBy { it.path.ifBlank { it.name } }; saveRecentAttachmentPaths(picked.map { it.path }); loadingAttachments = false } },
                         onPasteImageValue = { pendingImages = (pendingImages + it).distinct().take(4) },
                         onPickRecent = { recentPickerOpen = true },
+                        onPasteImageValue = { pendingImages = (pendingImages + it).distinct().take(4) },
+                        onPickRecent = { recentPickerOpen = true },
                         enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty() || pendingFiles.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
@@ -538,6 +541,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
                             onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
                             onPickFiles = { scope.launch { loadingAttachments = true; val picked = pickDocuments(); pendingFiles = (pendingFiles + picked).distinctBy { it.path.ifBlank { it.name } }; saveRecentAttachmentPaths(picked.map { it.path }); loadingAttachments = false } },
+                            onPasteImageValue = { pendingImages = (pendingImages + it).distinct().take(4) },
+                            onPickRecent = { recentPickerOpen = true },
                             onPasteImageValue = { pendingImages = (pendingImages + it).distinct().take(4) },
                             onPickRecent = { recentPickerOpen = true },
                             enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
@@ -718,6 +723,30 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             confirmButton = { TextButton(onClick = { recentPickerOpen = false }) { Text("Закрыть") } }
         )
     }
+    if (loadingAttachments) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+    if (recentPickerOpen) {
+        AlertDialog(onDismissRequest = { recentPickerOpen = false }, title = { Text("Недавние вложения") },
+            text = {
+                if (recentAttachmentPaths.isEmpty()) Text("История вложений пока пуста.")
+                else LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                    items(recentAttachmentPaths) { path ->
+                        ListItem(headlineContent = { Text(File(path).name) },
+                            supportingContent = { Text(path, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            modifier = Modifier.clickable {
+                                scope.launch {
+                                    loadingAttachments = true
+                                    val batch = readDroppedFiles(listOf(File(path)))
+                                    pendingImages = (pendingImages + batch.first).distinct().take(4)
+                                    pendingFiles = (pendingFiles + batch.second).distinctBy { it.path.ifBlank { it.name } }
+                                    loadingAttachments = false
+                                    recentPickerOpen = false
+                                }
+                            })
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { recentPickerOpen = false }) { Text("Закрыть") } })
+    }
     deleteTarget?.let { s ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
@@ -780,6 +809,7 @@ private fun ComposerBar(
             DropdownMenu(expanded = attachMenu, onDismissRequest = onDismissAttach) {
                 DropdownMenuItem(text = { Text("Фото / картинка") }, onClick = { onDismissAttach(); onPickImages() })
                 DropdownMenuItem(text = { Text("Файл") }, onClick = { onDismissAttach(); onPickFiles() })
+                DropdownMenuItem(text = { Text("Недавние вложения") }, onClick = { onDismissAttach(); onPickRecent() })
                 DropdownMenuItem(text = { Text("Недавние вложения") }, onClick = { onDismissAttach(); onPickRecent() })
             }
         }
