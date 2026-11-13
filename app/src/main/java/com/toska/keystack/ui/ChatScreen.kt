@@ -86,7 +86,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -98,6 +100,7 @@ import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.UiMessage
+import com.toska.keystack.ui.theme.MistralGradient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -202,10 +205,13 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(7.dp), modifier = Modifier.size(28.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("K", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                            }
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(7.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("K", color = Color.White, style = MaterialTheme.typography.titleMedium)
                         }
                         Spacer(Modifier.width(10.dp))
                         Column {
@@ -222,18 +228,18 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 }
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                        .background(Color(0xFF101012), RoundedCornerShape(9.dp)).padding(3.dp),
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(9.dp)).padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     listOf("Работа", "Код").forEach { mode ->
                         Surface(
                             modifier = Modifier.weight(1f).clickable { workspaceMode = mode },
-                            color = if (workspaceMode == mode) Color(0xFF303034) else Color.Transparent,
+                            color = if (workspaceMode == mode) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
                             shape = RoundedCornerShape(7.dp)
                         ) {
                             Text(mode, modifier = Modifier.padding(vertical = 8.dp),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = if (workspaceMode == mode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (workspaceMode == mode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelLarge)
                         }
                     }
@@ -241,12 +247,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 SidebarNavItem("▦", "Приложения", "Preview")
                 SidebarNavItem("✣", "Контекст")
                 SidebarNavItem("◷", "Расписание")
-                Text("ПРОЕКТЫ", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 18.dp, top = 18.dp, bottom = 7.dp))
-                Text("НЕДАВНИЕ", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 18.dp, top = 8.dp, bottom = 7.dp))
                 Text(
                     "ИСТОРИЯ",
                     style = MaterialTheme.typography.labelSmall,
@@ -316,13 +316,15 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                                 Text(
                                     provider.name + "  /  " + settings.model.ifBlank { "Модель не выбрана" },
                                     style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Icon(
                                     Icons.Default.ArrowDropDown,
                                     contentDescription = "Сменить провайдера или модель",
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -463,20 +465,34 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             Icon(Icons.Default.Stop, contentDescription = "Стоп")
                         }
                     } else {
-                        FilledIconButton(
-                            onClick = {
-                                val fileBlock = pendingFiles.joinToString("\n\n") { f ->
-                                    "Файл: ${f.name}\n```\n${f.text}\n```"
-                                }
-                                val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
-                                vm.send(fullText, pendingImages)
-                                input = ""
-                                pendingImages = emptyList()
-                                pendingFiles = emptyList()
-                            },
-                            enabled = input.isNotBlank() || pendingImages.isNotEmpty()
+                        val canSend = input.isNotBlank() || pendingImages.isNotEmpty()
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    if (canSend) Brush.linearGradient(MistralGradient)
+                                    else SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                    CircleShape
+                                )
+                                .clickable(enabled = canSend) {
+                                    val fileBlock = pendingFiles.joinToString("\n\n") { f ->
+                                        "Файл: ${f.name}\n\`\`\`
+${f.text}\n\`\`\`"
+                                    }
+                                    val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
+                                    vm.send(fullText, pendingImages)
+                                    input = ""
+                                    pendingImages = emptyList()
+                                    pendingFiles = emptyList()
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = "Отправить", tint = Color.White)
+                            Icon(
+                                Icons.Default.Send,
+                                contentDescription = "Отправить",
+                                tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(19.dp)
+                            )
                         }
                     }
                 }
@@ -627,12 +643,15 @@ private fun VibeWelcomePanel(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Surface(color = Color.Transparent, modifier = Modifier.size(42.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("K", color = Color(0xFFFF5A1F), style = MaterialTheme.typography.displaySmall)
-            }
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(15.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("K", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
             "Добро пожаловать. С чего начнём?",
             style = MaterialTheme.typography.headlineSmall,
@@ -656,15 +675,28 @@ private fun VibeWelcomePanel(
             )
         }
         Spacer(Modifier.height(22.dp))
-        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-            Text("✦   Настроить и изучить возможности KeyStack", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Расскажи, как эффективнее работать с KeyStack") })
-            Text("◉   Узнать о возможностях выбранной модели", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Расскажи о возможностях выбранной модели") })
-            Text("⌘   Проанализировать документ или файл", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Помоги проанализировать прикреплённый файл") })
-            Text("···   Посмотреть другие возможности", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onPrompt("Какие задачи ты можешь выполнить?") })
+        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WelcomeSuggestion("✦", "Настроить и изучить возможности KeyStack", "Расскажи, как эффективнее работать с KeyStack", onPrompt)
+            WelcomeSuggestion("◉", "Узнать о возможностях выбранной модели", "Расскажи о возможностях выбранной модели", onPrompt)
+            WelcomeSuggestion("⌘", "Проанализировать документ или файл", "Помоги проанализировать прикреплённый файл", onPrompt)
+            WelcomeSuggestion("···", "Посмотреть другие возможности", "Какие задачи ты можешь выполнить?", onPrompt)
+        }
+    }
+}
+
+/** Карточка-подсказка на экране приветствия в стиле Vibe. */
+@Composable
+private fun WelcomeSuggestion(symbol: String, title: String, prompt: String, onPrompt: (String) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable { onPrompt(prompt) },
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(13.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(symbol, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -677,7 +709,7 @@ private fun SidebarNavItem(symbol: String, label: String, tag: String? = null) {
         Spacer(Modifier.width(12.dp))
         Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f))
-        if (tag != null) Text(tag, color = Color(0xFF54B6FF), style = MaterialTheme.typography.labelSmall)
+        if (tag != null) Text(tag, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -777,8 +809,8 @@ fun MessageBubble(
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         Surface(
-            color = if (isUser) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-            shape = RoundedCornerShape(20.dp)
+            color = if (isUser) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+            shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(20.dp)
         ) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
@@ -865,7 +897,7 @@ fun TypingDots() {
                 Modifier
                     .size(8.dp)
                     .graphicsLayer(alpha = alpha)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
             )
         }
     }
