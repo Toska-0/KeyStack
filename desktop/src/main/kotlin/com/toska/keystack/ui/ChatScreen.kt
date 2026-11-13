@@ -197,7 +197,7 @@ private suspend fun readDroppedFiles(files: List<File>): Pair<List<String>, List
                     images += "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes)
                 }
             }
-            else -> if (file.length() <= 2_000_000L) docs += PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000), file.absolutePath)
+            else -> if (file.extension.lowercase() in setOf("txt", "md", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env") && file.length() <= 2_000_000L) docs += PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000), file.absolutePath)
         }
     } }
     images to docs
