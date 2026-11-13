@@ -1,6 +1,8 @@
 package com.toska.keystack.desktop
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,6 +23,8 @@ import com.toska.keystack.ui.SetupScreen
 import com.toska.keystack.ui.theme.KeyStackTheme
 import kotlinx.coroutines.launch
 import java.io.File
+import com.sun.jna.Memory
+import com.sun.jna.NativeLibrary
 
 fun main() = application {
     // Данные приложения: ~/.keystack (настройки, история чатов)
@@ -31,6 +35,8 @@ fun main() = application {
         title = "KeyStack",
         state = rememberWindowState(width = 1280.dp, height = 832.dp)
     ) {
+        val systemDark = isSystemInDarkTheme()
+        SideEffect { applyWindowsTitleBarTheme(systemDark) }
         AppRoot(dataDir)
     }
 }
@@ -77,5 +83,20 @@ fun AppRoot(dataDir: File) {
                 onOpenSettings = { showSetup = true }
             )
         }
+    }
+}
+
+
+private fun applyWindowsTitleBarTheme(dark: Boolean) {
+    if (!System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)) return
+    runCatching {
+        val hwnd = NativeLibrary.getInstance("user32")
+            .getFunction("GetForegroundWindow")
+            .invokePointer(emptyArray())
+        if (hwnd == null) return
+        val value = Memory(4).apply { setInt(0, if (dark) 1 else 0) }
+        val dwm = NativeLibrary.getInstance("dwmapi").getFunction("DwmSetWindowAttribute")
+        val result = dwm.invokeInt(arrayOf(hwnd, 20, value, 4))
+        if (result != 0) dwm.invokeInt(arrayOf(hwnd, 19, value, 4))
     }
 }
