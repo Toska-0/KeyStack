@@ -73,6 +73,9 @@ fun AppRoot(dataDir: File) {
                 onSaveTheme = { mode, dyn ->
                     scope.launch { settingsStore.saveTheme(mode, dyn) }
                 },
+                onSaveWorkspace = { path ->
+                    scope.launch { settingsStore.saveWorkspace(path) }
+                },
                 onBack = if (settings.providerId.isNotBlank() && settings.apiKey.isNotBlank()) {
                     { showSetup = false }
                 } else null
