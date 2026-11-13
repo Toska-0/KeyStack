@@ -33,6 +33,8 @@ class ChatViewModel : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+    private val _apiStatus = MutableStateFlow("Не проверено")
+    val apiStatus: StateFlow<String> = _apiStatus
 
     private val _settings = MutableStateFlow(Settings("", "", "", ""))
     val settings: StateFlow<Settings> = _settings
@@ -192,19 +194,51 @@ class ChatViewModel : ViewModel() {
         val apiMessages = history.map { ChatMessage(it.role, it.content, it.images) }
         job = viewModelScope.launch {
             val sb = StringBuilder()
-            client.stream(Providers.byId(s.providerId), s.apiKey, s.baseUrl, s.model, apiMessages)
-                .collect { ev ->
+            val candidates = buildList {
+                add(Triple(Providers.byId(s.providerId), s.apiKey, s.model to s.baseUrl))
+                Providers.all.filter { it.id != s.providerId && !s.savedKeys[it.id].isNullOrBlank() && !s.savedModels[it.id].isNullOrBlank() }
+                    .forEach { p -> add(Triple(p, s.savedKeys[p.id].orEmpty(), s.savedModels[p.id].orEmpty() to s.savedBaseUrls[p.id].orEmpty())) }
+            }
+            var succeeded = false
+            var lastFailure: String? = null
+            for ((index, candidate) in candidates.withIndex()) {
+                val p = candidate.first
+                val key = candidate.second
+                val modelId = candidate.third.first
+                val base = candidate.third.second
+                _apiStatus.value = if (index == 0) "Подключение к ${p.name}…" else "Пробую резервный провайдер: ${p.name}"
+                val attemptText = StringBuilder()
+                var failure: String? = null
+                client.stream(p, key, base, modelId, apiMessages).collect { ev ->
                     when (ev) {
                         is StreamEvent.Delta -> {
-                            sb.append(ev.text)
+                            attemptText.append(ev.text)
                             _messages.value = _messages.value.dropLast(1) +
-                                UiMessage("assistant", sb.toString(), isStreaming = true, generationMs = System.currentTimeMillis() - startedAt, tokenEstimate = estimateTokens(sb.toString()))
+                                UiMessage("assistant", attemptText.toString(), isStreaming = true, generationMs = System.currentTimeMillis() - startedAt, tokenEstimate = estimateTokens(attemptText.toString()))
                             _generationMs.value = System.currentTimeMillis() - startedAt
-                            _tokenEstimate.value = history.sumOf { estimateTokens(it.content) } + estimateTokens(sb.toString())
+                            _tokenEstimate.value = history.sumOf { estimateTokens(it.content) } + estimateTokens(attemptText.toString())
                         }
-                        is StreamEvent.Failure -> _error.value = ev.message
+                        is StreamEvent.Failure -> failure = friendlyProviderError(ev.message)
                     }
                 }
+                if (failure == null && attemptText.isNotEmpty()) {
+                    sb.append(attemptText)
+                    succeeded = true
+                    _error.value = null
+                    _apiStatus.value = "Подключено · ${p.name}"
+                    if (index > 0) {
+                        store.setActiveProvider(p.id)
+                        store.saveModel(p.id, modelId)
+                    }
+                    break
+                }
+                lastFailure = failure ?: "Провайдер завершил запрос без ответа"
+                if (index < candidates.lastIndex) _messages.value = history + UiMessage("assistant", "", isStreaming = true)
+            }
+            if (!succeeded) {
+                _error.value = lastFailure ?: "Не удалось подключиться к провайдеру"
+                _apiStatus.value = "Нет подключения к API"
+            }
             val final = sb.toString()
             val elapsed = System.currentTimeMillis() - startedAt
             _generationMs.value = elapsed
@@ -220,6 +254,18 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    private fun friendlyProviderError(raw: String): String {
+        val lower = raw.lowercase()
+        return when {
+            "401" in lower || "unauthorized" in lower || "invalid api key" in lower -> "Неверный API-ключ. Проверь ключ в настройках провайдера."
+            "403" in lower || "forbidden" in lower -> "Доступ запрещён. Проверь права ключа и доступность модели."
+            "404" in lower -> "Модель или API-адрес не найдены. Проверь выбранную модель и Base URL."
+            "429" in lower || "rate limit" in lower || "quota" in lower -> "Превышен лимит запросов или исчерпана квота провайдера."
+            "timeout" in lower -> "Провайдер не ответил вовремя. Попробуй ещё раз."
+            "unable to resolve" in lower || "failed to connect" in lower || "network" in lower -> "Нет соединения с сервером провайдера. Проверь интернет."
+            else -> raw.take(320).ifBlank { "Неизвестная ошибка провайдера." }
+        }
+    }
     fun editMessage(index: Int, replacement: String) {
         if (_busy.value || replacement.isBlank() || index !in _messages.value.indices) return
         val target = _messages.value[index]
