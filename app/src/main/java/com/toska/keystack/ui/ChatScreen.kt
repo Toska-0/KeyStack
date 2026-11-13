@@ -530,7 +530,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             Icon(Icons.Default.Stop, contentDescription = "Стоп")
                         }
                     } else {
-                        val canSend = input.isNotBlank() || pendingImages.isNotEmpty()
+                        val canSend = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
