@@ -103,7 +103,6 @@ import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
-import com.toska.keystack.ProviderQuota
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
 import kotlinx.coroutines.Dispatchers
@@ -148,7 +147,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 
     // Переключатель провайдера/модели
     var showSwitcher by remember { mutableStateOf(false) }
-    var quota by remember { mutableStateOf<ProviderQuota?>(null) }
+    var quota by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var modelContextLimit by remember { mutableStateOf<Int?>(null) }
     val estimatedContextTokens by vm.tokenEstimate.collectAsState()
     var quotaStatus by remember { mutableStateOf("Проверка API…") }
@@ -158,7 +157,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         quotaStatus = if (settings.apiKey.isBlank()) "API-ключ не настроен" else "Проверка API…"
         while (true) {
             if (settings.apiKey.isNotBlank()) {
-                quota = client.fetchQuota(Providers.byId(settings.providerId), settings.apiKey)
+                quota = client.fetchQuota(Providers.byId(settings.providerId), settings.apiKey)?.let { it.used to it.limit }
                 quotaStatus = if (settings.providerId == "openrouter") {
                     if (quota != null) "API подключён" else "Квота OpenRouter недоступна"
                 } else apiStatus
@@ -389,8 +388,8 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     }
                     if (settings.providerId == "openrouter" && quota != null) {
                         val q = quota!!
-                        val fraction = if (q.limit > 0) (q.used / q.limit).toFloat().coerceIn(0f, 1f) else 0f
-                        Text("$" + "%.2f".format(q.remaining) + " осталось из $" + "%.2f".format(q.limit), style = MaterialTheme.typography.labelSmall)
+                        val fraction = if (q.limit > 0) (q.first / q.second).toFloat().coerceIn(0f, 1f) else 0f
+                        Text("$" + "%.2f".format((q.second - q.first).coerceAtLeast(0.0)) + " осталось из $" + "%.2f".format(q.second), style = MaterialTheme.typography.labelSmall)
                         Spacer(Modifier.width(8.dp))
                         Box(Modifier.width(80.dp)) { LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth()) }
                     } else Text(if (settings.providerId == "openrouter") "Квота недоступна" else "Лимит не раскрывается API", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
