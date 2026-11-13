@@ -1,15 +1,11 @@
 package com.toska.keystack.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun KeyStackTheme(
@@ -24,6 +20,8 @@ fun KeyStackTheme(
     }
     val colorScheme = when {
         themeMode == "amoled" -> darkColorScheme(
+            primary = Color(0xFFFF5A1F),
+            onPrimary = Color.White,
             background = Color.Black,
             surface = Color.Black,
             surfaceVariant = Color(0xFF141414),
@@ -33,40 +31,40 @@ fun KeyStackTheme(
             surfaceContainerHigh = Color(0xFF141414),
             surfaceContainerHighest = Color(0xFF1A1A1A)
         )
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
+        false -> darkColorScheme()
         darkTheme -> darkColorScheme(
-            primary = Color(0xFFECECEC),
-            onPrimary = Color(0xFF202020),
-            background = Color(0xFF212121),
-            onBackground = Color(0xFFECECEC),
-            surface = Color(0xFF212121),
-            onSurface = Color(0xFFECECEC),
-            surfaceVariant = Color(0xFF303030),
-            onSurfaceVariant = Color(0xFFB4B4B4),
-            surfaceContainer = Color(0xFF262626),
-            surfaceContainerLow = Color(0xFF252525),
-            surfaceContainerLowest = Color(0xFF202020),
-            surfaceContainerHigh = Color(0xFF303030),
-            surfaceContainerHighest = Color(0xFF383838),
-            secondaryContainer = Color(0xFF303030),
-            onSecondaryContainer = Color(0xFFECECEC),
-            outline = Color(0xFF555555)
+            primary = Color(0xFFFF5A1F),
+            onPrimary = Color.White,
+            background = Color(0xFF171717),
+            onBackground = Color(0xFFF4F1EE),
+            surface = Color(0xFF1E1E1E),
+            onSurface = Color(0xFFF4F1EE),
+            surfaceVariant = Color(0xFF292929),
+            onSurfaceVariant = Color(0xFFB8B2AD),
+            surfaceContainer = Color(0xFF202020),
+            surfaceContainerLow = Color(0xFF1B1B1B),
+            surfaceContainerLowest = Color(0xFF151515),
+            surfaceContainerHigh = Color(0xFF292929),
+            surfaceContainerHighest = Color(0xFF333333),
+            secondaryContainer = Color(0xFF38251F),
+            onSecondaryContainer = Color(0xFFFFD8CB),
+            outline = Color(0xFF49413D)
         )
         else -> lightColorScheme(
-            primary = Color(0xFF202020),
+            primary = Color(0xFFE94F16),
             onPrimary = Color.White,
-            background = Color(0xFFFFFFFF),
-            surface = Color(0xFFFFFFFF),
-            surfaceVariant = Color(0xFFF4F4F4),
-            surfaceContainer = Color(0xFFF7F7F7),
-            surfaceContainerLow = Color(0xFFFAFAFA),
-            surfaceContainerHigh = Color(0xFFF1F1F1),
-            surfaceContainerHighest = Color(0xFFEAEAEA),
-            secondaryContainer = Color(0xFFECECEC),
-            outline = Color(0xFFD7D7D7)
+            background = Color(0xFFFAF8F6),
+            surface = Color(0xFFFFFEFC),
+            onSurface = Color(0xFF252321),
+            surfaceVariant = Color(0xFFF1EEEB),
+            onSurfaceVariant = Color(0xFF706B66),
+            surfaceContainer = Color(0xFFF4F1EE),
+            surfaceContainerLow = Color(0xFFFAF8F6),
+            surfaceContainerHigh = Color(0xFFEDE9E5),
+            surfaceContainerHighest = Color(0xFFE6E1DC),
+            secondaryContainer = Color(0xFFFFE8DF),
+            onSecondaryContainer = Color(0xFF6D2B12),
+            outline = Color(0xFFD9D2CC)
         )
     }
     MaterialTheme(colorScheme = colorScheme, content = content)
