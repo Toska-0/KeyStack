@@ -380,7 +380,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         val contextFraction = (estimatedContextTokens.toFloat() / modelContextLimit!!.coerceAtLeast(1)).coerceIn(0f, 1f)
                         Text("Контекст ≈ " + estimatedContextTokens + " / " + modelContextLimit + " токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         LinearProgressIndicator(progress = { contextFraction }, modifier = Modifier.fillMaxWidth())
-                    } else Text("Лимит не раскрывается API · использовано ≈ $estimatedContextTokens токенов · использовано ≈ $estimatedContextTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else Text("Лимит не раскрывается API · использовано ≈ $estimatedContextTokens токенов", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (settings.providerId == "openrouter" && quota != null) {
                         val q = quota!!
                         val fraction = if (q.second > 0) (q.first / q.second).toFloat().coerceIn(0f, 1f) else 0f
