@@ -511,6 +511,11 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         itemsIndexed(messages) { idx, msg ->
                             if (messageSearch.isBlank() || msg.content.contains(messageSearch, ignoreCase = true)) MessageBubble(msg = msg, isLastAssistant = idx == lastAssistantIdx, busy = busy,
                                 onRegenerate = { vm.regenerate() },
+                                onEdit = {
+                                    editMessageText = msg.content
+                                    editMessageTarget = idx
+                                },
+                                onBranch = { vm.branchFrom(idx) },
                                 fontScale = settings.fontScale,
                                 maxWidth = settings.messageWidth,
                                 animationsEnabled = settings.animationsEnabled)
