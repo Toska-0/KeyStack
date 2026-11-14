@@ -1,4 +1,5 @@
 name: Build Windows Desktop
+# Build workflow: push-triggered and manually runnable from GitHub Actions.
 
 on:
   push:
