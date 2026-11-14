@@ -85,7 +85,9 @@ internal fun applyWorkspaceWrite(workspacePath: String, proposal: ProposedWorksp
         if (Files.exists(target)) {
             require(!Files.isSymbolicLink(target) && target.toRealPath().startsWith(root)) { "Запись через символическую ссылку запрещена" }
             val backupDir = root.resolve(".keystack-backups")
+            require(!Files.isSymbolicLink(backupDir)) { "Каталог резервных копий не может быть символической ссылкой" }
             Files.createDirectories(backupDir)
+            require(backupDir.toRealPath().startsWith(root)) { "Каталог резервных копий выходит за пределы рабочей папки" }
             Files.copy(target, backupDir.resolve(target.fileName.toString() + "." + System.currentTimeMillis() + ".bak"), StandardCopyOption.REPLACE_EXISTING)
         }
         val temp = Files.createTempFile(target.parent, ".keystack-", ".tmp")
