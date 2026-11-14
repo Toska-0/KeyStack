@@ -1,5 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.awt.Color
+import java.awt.LinearGradientPaint
 import java.awt.RenderingHints
 import java.awt.geom.Path2D
 import java.awt.geom.RoundRectangle2D
@@ -60,7 +61,7 @@ val generateWindowsIcon by tasks.registering {
             Color(0x26, 0x3C, 0x9B)
         )
         val fractions = floatArrayOf(0f, 0.28f, 0.55f, 0.78f, 1f)
-        g.paint = java.awt.LinearGradientPaint(75f, 74f, 181f, 182f, fractions, colors)
+        g.paint = LinearGradientPaint(75f, 74f, 181f, 182f, fractions, colors)
         g.fill(p)
         g.dispose()
 
