@@ -223,23 +223,6 @@ fun ChatScreen(
         }
     }
 
-    // Follow streamed output only while the user is actually at the bottom.
-    // Checking the last item's bottom edge also works when one message is taller than the viewport.
-    LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
-        if (messages.isNotEmpty()) {
-            val layout = listState.layoutInfo
-            val lastItem = layout.visibleItemsInfo.lastOrNull { it.index == messages.lastIndex }
-            val distanceToBottom = lastItem?.let {
-                it.offset + it.size - layout.viewportEndOffset
-            }
-            val isAtBottom = layout.totalItemsCount == 0 ||
-                (distanceToBottom != null && distanceToBottom <= 48)
-            if (isAtBottom) {
-                listState.scrollToItem(messages.lastIndex, Int.MAX_VALUE)
-            }
-        }
-    }
-
     val currentSession = sessions.firstOrNull { it.id == currentId }
     val provider = Providers.byId(settings.providerId)
     val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" && !it.isStreaming }
@@ -411,7 +394,7 @@ fun ChatScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
-                    itemsIndexed(messages) { idx, msg ->
+                    itemsIndexed(messages, key = { index, _ -> index }) { idx, msg ->
                         MessageBubble(
                             msg = msg,
                             isLastAssistant = idx == lastAssistantIdx,
