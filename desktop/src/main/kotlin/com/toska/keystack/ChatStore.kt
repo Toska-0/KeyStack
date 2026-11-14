@@ -13,6 +13,8 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.AtomicMoveNotSupportedException
+import java.util.Base64
+import java.security.MessageDigest
 
 @Serializable
 data class AttachedFile(
@@ -54,8 +56,34 @@ data class ChatSession(
 class ChatStore(baseDir: File) {
 
     private val file = File(baseDir, "chats.json")
+    private val imagesDir = File(baseDir, "attachments")
     private val json = Json { ignoreUnknownKeys = true }
     private val mutex = Mutex()
+    private fun imageToDisk(uri: String): String {
+        val marker = ";base64,"
+        if (!uri.startsWith("data:") || marker !in uri) return uri
+        val mime = uri.substringAfter("data:").substringBefore(marker)
+        val payload = uri.substringAfter(marker)
+        val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        val target = File(imagesDir, digest + ".img")
+        if (!target.exists()) { imagesDir.mkdirs(); target.writeBytes(Base64.getDecoder().decode(payload)) }
+        return "keystack-image:" + digest + ":" + mime
+    }
+
+    private fun imageFromDisk(reference: String): String {
+        if (!reference.startsWith("keystack-image:")) return reference
+        val parts = reference.split(":", limit = 3)
+        if (parts.size != 3) return ""
+        val imageFile = File(imagesDir, parts[1] + ".img")
+        if (!imageFile.exists()) return ""
+        return "data:" + parts[2] + ";base64," + Base64.getEncoder().encodeToString(imageFile.readBytes())
+    }
+
+    private fun mapImages(session: ChatSession, transform: (String) -> String): ChatSession =
+        session.copy(
+            messages = session.messages.map { message -> message.copy(images = message.images.map(transform)) },
+            pendingImages = session.pendingImages.map(transform)
+        )
 
     suspend fun load(): List<ChatSession> = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext emptyList()
@@ -83,7 +111,8 @@ class ChatStore(baseDir: File) {
             file.parentFile?.mkdirs()
             val temp = File(file.parentFile, "chats.json.tmp")
             val backup = File(file.parentFile, "chats.json.bak")
-            temp.writeText(json.encodeToString(sessions), Charsets.UTF_8)
+            val diskSessions = sessions.map { session -> mapImages(session, ::imageToDisk) }
+            temp.writeText(json.encodeToString(diskSessions), Charsets.UTF_8)
             if (file.exists()) Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
             try {
                 Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
