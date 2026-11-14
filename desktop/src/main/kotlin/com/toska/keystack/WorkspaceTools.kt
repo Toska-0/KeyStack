@@ -56,7 +56,7 @@ $snapshot
 """.trim()
 }
 
-internal data class ProposedWorkspaceWrite(val relativePath: String, val content: String)
+data class ProposedWorkspaceWrite(val relativePath: String, val content: String)
 
 internal fun extractWorkspaceWrites(response: String): Pair<String, List<ProposedWorkspaceWrite>> {
     val block = Regex("""(?s)```keystack-write\s+path="([^"]+)"\s*\n(.*?)\n```""")
