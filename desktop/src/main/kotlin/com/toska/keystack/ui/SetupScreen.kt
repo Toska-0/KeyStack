@@ -13,11 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -28,6 +28,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,14 +59,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.Settings
-import com.toska.keystack.ui.theme.MistralGradient
 import com.toska.keystack.ui.theme.KeyStackMark
-import javax.swing.JFileChooser
+import com.toska.keystack.ui.theme.MistralGradient
 import kotlinx.coroutines.delay
+import javax.swing.JFileChooser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,8 +85,9 @@ fun SetupScreen(
     var model by remember { mutableStateOf(initial.model) }
     var baseUrl by remember { mutableStateOf(initial.baseUrl) }
     var showKey by remember { mutableStateOf(false) }
-    var showSheet by remember { mutableStateOf(false) }
-    var search by remember { mutableStateOf("") }
+    var providerMenu by remember { mutableStateOf(false) }
+    var showModelSheet by remember { mutableStateOf(false) }
+    var modelSearch by remember { mutableStateOf("") }
 
     var themeMode by remember { mutableStateOf(initial.themeMode) }
     var workspacePath by remember { mutableStateOf(initial.workspacePath) }
@@ -92,11 +96,10 @@ fun SetupScreen(
     var animationsEnabled by remember { mutableStateOf(initial.animationsEnabled) }
     var accentColor by remember { mutableStateOf(initial.accentColor) }
 
-    // Черновики полей по провайдерам — чтобы ввод не терялся при переключении
     val draftKeys = remember { mutableStateMapOf<String, String>() }
     val draftModels = remember { mutableStateMapOf<String, String>() }
     val draftBaseUrls = remember { mutableStateMapOf<String, String>() }
-    var prevId by remember { mutableStateOf(selectedId) }
+    var previousId by remember { mutableStateOf(selectedId) }
 
     var fetchedModels by remember { mutableStateOf<List<String>?>(null) }
     var loadingModels by remember { mutableStateOf(false) }
@@ -107,20 +110,18 @@ fun SetupScreen(
     val client = remember { LlmClient() }
     val effectiveUrl = if (provider.needsBaseUrl) baseUrl.trim() else provider.baseUrl
 
-    // При смене провайдера — подставляем его сохранённые ключ/модель/baseURL
     LaunchedEffect(selectedId) {
-        if (selectedId != prevId) {
-            draftKeys[prevId] = apiKey
-            draftModels[prevId] = model
-            draftBaseUrls[prevId] = baseUrl
+        if (selectedId != previousId) {
+            draftKeys[previousId] = apiKey
+            draftModels[previousId] = model
+            draftBaseUrls[previousId] = baseUrl
             apiKey = draftKeys[selectedId] ?: initial.savedKeys[selectedId] ?: ""
             model = draftModels[selectedId] ?: initial.savedModels[selectedId] ?: ""
             baseUrl = draftBaseUrls[selectedId] ?: initial.savedBaseUrls[selectedId] ?: ""
-            prevId = selectedId
+            previousId = selectedId
         }
     }
 
-    // Автозагрузка моделей по ключу (с debounce на ввод)
     LaunchedEffect(selectedId, apiKey, effectiveUrl) {
         if (apiKey.trim().length >= 8 && effectiveUrl.isNotBlank()) {
             delay(700)
@@ -139,327 +140,346 @@ fun SetupScreen(
     }
 
     val options = fetchedModels?.takeIf { it.isNotEmpty() } ?: provider.models
-    val valid = apiKey.isNotBlank() && model.isNotBlank() &&
-        (!provider.needsBaseUrl || baseUrl.isNotBlank())
+    val valid = apiKey.isNotBlank() && model.isNotBlank() && (!provider.needsBaseUrl || baseUrl.isNotBlank())
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("KeyStack — настройка") },
+                title = { Text("Настройки", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     Box(
-                        Modifier
-                            .padding(start = 12.dp)
-                            .size(30.dp)
-                            .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(8.dp)),
+                        Modifier.padding(start = 16.dp).size(32.dp)
+                            .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(9.dp)),
                         contentAlignment = Alignment.Center
-                    ) {
-                        KeyStackMark(Modifier.size(16.dp))
-                    }
+                    ) { KeyStackMark(Modifier.size(20.dp)) }
                 },
                 actions = {
-                    if (onBack != null) {
-                        TextButton(onClick = onBack) { Text("В чат") }
-                    }
+                    if (onBack != null) TextButton(onClick = onBack) { Text("Вернуться в чат") }
                 }
             )
         }
     ) { padding ->
         Column(
-            Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Провайдеры и ключи", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Для каждого провайдера сохраняется свой ключ — переключайся в один тап.",
-                style = MaterialTheme.typography.bodySmall
-            )
+            Column(
+                Modifier.widthIn(max = 880.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("Персонализируйте KeyStack", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "Подключите провайдера, настройте внешний вид и выберите папку для работы с файлами.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            Providers.all.forEach { p ->
-                val hasKey = initial.savedKeys[p.id]?.isNotBlank() == true
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedId = p.id },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = if (p.id == selectedId)
-                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    else
-                        CardDefaults.cardColors()
+                SettingsSection(
+                    title = "Подключение",
+                    description = "API-ключ хранится на этом компьютере и используется для прямых запросов к провайдеру."
                 ) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = p.id == selectedId,
-                            onClick = { selectedId = p.id }
-                        )
-                        Column {
-                            Text(p.name, style = MaterialTheme.typography.bodyLarge)
-                            if (hasKey) {
-                                Text(
-                                    "Ключ сохранён",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                    Box {
+                        Card(
+                            onClick = { providerMenu = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(13.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Провайдер", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(provider.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        if (initial.savedKeys[selectedId].isNullOrBlank()) "Ключ ещё не сохранён" else "Для этого провайдера есть сохранённый ключ",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Выбрать провайдера", tint = MaterialTheme.colorScheme.primary)
                             }
-                            if (p.keyUrl.isNotBlank()) {
-                                Text(
-                                    if (p.id == "kiro") "Инструкция по подключению" else "Получить API-ключ",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.clickable { uriHandler.openUri(p.keyUrl) }
+                        }
+                        DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
+                            Providers.all.forEach { item ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(item.name)
+                                            if (!initial.savedKeys[item.id].isNullOrBlank()) {
+                                                Text("Ключ сохранён", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    },
+                                    leadingIcon = if (item.id == selectedId) {{ Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }} else null,
+                                    onClick = { providerMenu = false; selectedId = item.id }
                                 )
                             }
                         }
                     }
-                }
-            }
 
-            if (provider.needsBaseUrl) {
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = { baseUrl = it },
-                    label = { Text("Base URL (например https://api.example.com/v1)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (provider.id == "kiro") {
+                    if (provider.needsBaseUrl) {
+                        OutlinedTextField(
+                            value = baseUrl,
+                            onValueChange = { baseUrl = it },
+                            label = { Text("Base URL") },
+                            placeholder = { Text("https://api.example.com/v1") },
+                            supportingText = if (provider.id == "kiro") {
+                                { Text("Укажите адрес запущенного Kiro API gateway.") }
+                            } else null,
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = { Text("API-ключ") },
+                        singleLine = true,
+                        visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showKey = !showKey }) {
+                                Icon(
+                                    if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (showKey) "Скрыть ключ" else "Показать ключ"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (provider.keyUrl.isNotBlank()) {
+                        TextButton(onClick = { uriHandler.openUri(provider.keyUrl) }) {
+                            Text(if (provider.id == "kiro") "Открыть инструкцию" else "Где получить API-ключ?")
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = model,
+                            onValueChange = { model = it },
+                            label = { Text("ID модели") },
+                            placeholder = { Text("Например, модель из каталога провайдера") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(onClick = { modelSearch = ""; showModelSheet = true }, enabled = options.isNotEmpty()) {
+                            Text("Выбрать")
+                        }
+                    }
+                    when {
+                        loadingModels -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text("Загружаю модели…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        fetchedModels != null && fetchedModels!!.isNotEmpty() -> Text(
+                            "Найдено моделей: ${fetchedModels!!.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        fetchFailed -> Text(
+                            "Список моделей недоступен. Можно указать ID вручную.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            val url = if (provider.needsBaseUrl) baseUrl.trim() else provider.baseUrl
+                            onDone(provider.id, apiKey.trim(), model.trim(), url)
+                        },
+                        enabled = valid,
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(13.dp)
+                    ) { Text("Сохранить настройки") }
+                }
+
+                SettingsSection(
+                    title = "Внешний вид",
+                    description = "Подстройте тему и акцент под себя."
+                ) {
+                    Text("Тема", style = MaterialTheme.typography.titleSmall)
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        listOf("system" to "Как в системе", "light" to "Светлая", "dark" to "Тёмная", "amoled" to "AMOLED — чёрная").forEach { (id, label) ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    themeMode = id
+                                    onSaveTheme(id, false)
+                                }.padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = themeMode == id,
+                                    onClick = { themeMode = id; onSaveTheme(id, false) }
+                                )
+                                Text(label, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Акцентный цвет", style = MaterialTheme.typography.titleSmall)
+                        Text("Цвет кнопок и активных элементов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                            listOf(
+                                "orange" to Color(0xFFFF5A1F), "blue" to Color(0xFF4D8DFF),
+                                "purple" to Color(0xFF9B72E8), "green" to Color(0xFF35A879),
+                                "pink" to Color(0xFFE65B91), "cyan" to Color(0xFF20AFC2)
+                            ).forEach { (id, color) ->
+                                Box(
+                                    Modifier.size(32.dp).background(color, CircleShape)
+                                        .clickable { accentColor = id; onSaveAccentColor(id) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (accentColor == id) Icon(Icons.Default.Check, contentDescription = "Выбрано", tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SettingsSection(
+                    title = "Чат",
+                    description = "Настройки чтения и поведения интерфейса."
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Размер текста", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Text("${(fontScale * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Slider(value = fontScale, onValueChange = {
+                            fontScale = it
+                            onSaveUiPreferences(it, messageWidth.toInt(), animationsEnabled)
+                        }, valueRange = 0.85f..1.4f)
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ширина сообщений", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Text("${messageWidth.toInt()} dp", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Slider(value = messageWidth, onValueChange = {
+                            messageWidth = it
+                            onSaveUiPreferences(fontScale, it.toInt(), animationsEnabled)
+                        }, valueRange = 560f..1100f)
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Анимации", style = MaterialTheme.typography.bodyMedium)
+                            Text("Плавные переходы и появление сообщений", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = animationsEnabled, onCheckedChange = {
+                            animationsEnabled = it
+                            onSaveUiPreferences(fontScale, messageWidth.toInt(), it)
+                        })
+                    }
+                }
+
+                SettingsSection(
+                    title = "Рабочая папка",
+                    description = "KeyStack сможет читать поддерживаемые текстовые файлы и предлагать изменения. Запись выполняется только после вашего подтверждения."
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
+                        Text(
+                            workspacePath.ifBlank { "Папка не выбрана" },
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (workspacePath.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = {
+                            val chooser = JFileChooser().apply {
+                                dialogTitle = "Выберите рабочую папку KeyStack"
+                                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                                isAcceptAllFileFilterUsed = false
+                                if (workspacePath.isNotBlank()) currentDirectory = java.io.File(workspacePath)
+                            }
+                            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                                workspacePath = chooser.selectedFile.absolutePath
+                                onSaveWorkspace(workspacePath)
+                            }
+                        }) { Text(if (workspacePath.isBlank()) "Выбрать папку" else "Изменить папку") }
+                        if (workspacePath.isNotBlank()) {
+                            TextButton(onClick = { workspacePath = ""; onSaveWorkspace("") }) { Text("Отключить") }
+                        }
+                    }
                     Text(
-                        "Kiro подключается через OpenAI-совместимый Kiro API gateway. Запусти шлюз отдельно, укажи его адрес и API-ключ. Пример адреса: http://127.0.0.1:8080/v1. На Android вместо 127.0.0.1 укажи IP компьютера или сервера в сети.",
+                        "Не выбирайте папку с паролями, ключами или другими файлами, которые не хотите отправлять AI-провайдеру.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(Modifier.height(8.dp))
             }
-
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text("API-ключ для " + provider.name) },
-                singleLine = true,
-                visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showKey = !showKey }) {
-                        Icon(
-                            if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = null
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            if (options.isNotEmpty()) {
-                // Список — быстрый выбор; поле ниже также позволяет указать любой model ID.
-                Card(
-                    onClick = {
-                        search = ""
-                        showSheet = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "Модель",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                model.ifBlank { "Нажми, чтобы выбрать" },
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Выбрать модель")
-                    }
-                }
-            }
-
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text("ID модели (можно ввести вручную)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            when {
-                loadingModels -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text("Загружаю модели, доступные с этим ключом…", style = MaterialTheme.typography.bodySmall)
-                }
-                fetchedModels != null && fetchedModels!!.isNotEmpty() -> Text(
-                    "Доступно моделей: ${fetchedModels!!.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                fetchFailed && options.isEmpty() -> Text(
-                    "Не удалось получить список моделей — впиши ID модели вручную",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-
-            Button(
-                onClick = {
-                    val url = if (provider.needsBaseUrl) baseUrl.trim() else provider.baseUrl
-                    onDone(provider.id, apiKey.trim(), model.trim(), url)
-                },
-                enabled = valid,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(50)
-            ) {
-                Text("Сохранить и открыть чат")
-            }
-
-            Text("Оформление", style = MaterialTheme.typography.titleMedium)
-
-            val themes = listOf(
-                "system" to "Как в системе",
-                "light" to "Светлая",
-                "dark" to "Тёмная",
-                "amoled" to "AMOLED (чёрная)"
-            )
-            themes.forEach { (id, label) ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            themeMode = id
-                            onSaveTheme(id, false)
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = themeMode == id,
-                        onClick = {
-                            themeMode = id
-                            onSaveTheme(id, false)
-                        }
-                    )
-                    Text(label, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-
-            Text("Акцентный цвет", style = MaterialTheme.typography.titleMedium)
-            Text("Цвет кнопок, выделений и активных элементов", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf("orange" to Color(0xFFFF5A1F), "blue" to Color(0xFF4D8DFF), "purple" to Color(0xFF9B72E8), "green" to Color(0xFF35A879), "pink" to Color(0xFFE65B91), "cyan" to Color(0xFF20AFC2)).forEach { (id, color) ->
-                    Box(Modifier.size(34.dp).background(color, CircleShape).clickable { accentColor = id; onSaveAccentColor(id) }, contentAlignment = Alignment.Center) {
-                        if (accentColor == id) Icon(Icons.Default.Check, contentDescription = "Выбран", tint = Color.White)
-                    }
-                }
-            }
-            Text("Интерфейс чата", style = MaterialTheme.typography.titleMedium)
-            Text("Размер текста: ${(fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-            Slider(value = fontScale, onValueChange = {
-                fontScale = it
-                onSaveUiPreferences(it, messageWidth.toInt(), animationsEnabled)
-            }, valueRange = 0.85f..1.4f)
-            Text("Ширина сообщений: ${messageWidth.toInt()} dp", style = MaterialTheme.typography.bodyMedium)
-            Slider(value = messageWidth, onValueChange = {
-                messageWidth = it
-                onSaveUiPreferences(fontScale, it.toInt(), animationsEnabled)
-            }, valueRange = 560f..1100f)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Анимации интерфейса", modifier = Modifier.weight(1f))
-                Switch(checked = animationsEnabled, onCheckedChange = {
-                    animationsEnabled = it
-                    onSaveUiPreferences(fontScale, messageWidth.toInt(), it)
-                })
-            }
-
-            Text("Рабочая папка ИИ", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "KeyStack сможет читать текстовые файлы из этой папки и создавать или обновлять файлы по запросу. Доступ ограничен выбранной папкой.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            OutlinedTextField(
-                value = workspacePath,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Путь к рабочей папке") },
-                placeholder = { Text("Папка не выбрана") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    val chooser = JFileChooser().apply {
-                        dialogTitle = "Выберите рабочую папку KeyStack"
-                        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-                        isAcceptAllFileFilterUsed = false
-                        if (workspacePath.isNotBlank()) currentDirectory = java.io.File(workspacePath)
-                    }
-                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                        workspacePath = chooser.selectedFile.absolutePath
-                        onSaveWorkspace(workspacePath)
-                    }
-                }) { Text(if (workspacePath.isBlank()) "Выбрать папку" else "Изменить папку") }
-                if (workspacePath.isNotBlank()) {
-                    TextButton(onClick = {
-                        workspacePath = ""
-                        onSaveWorkspace("")
-                    }) { Text("Отключить") }
-                }
-            }
-
-            Text(
-                "Ключи хранятся только на этом компьютере и отправляются напрямую провайдерам.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            Spacer(Modifier.height(24.dp))
         }
     }
 
-    if (showSheet) {
+    if (showModelSheet) {
         val sheetState = rememberModalBottomSheetState()
-        val filtered = options.filter { it.contains(search.trim(), ignoreCase = true) }
-        ModalBottomSheet(
-            onDismissRequest = { showSheet = false },
-            sheetState = sheetState
-        ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text("Выбор модели", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
+        val filteredModels = options.filter { it.contains(modelSearch.trim(), ignoreCase = true) }
+        ModalBottomSheet(onDismissRequest = { showModelSheet = false }, sheetState = sheetState) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                Text("Модели · ${provider.name}", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    label = { Text("Поиск") },
+                    value = modelSearch,
+                    onValueChange = { modelSearch = it },
+                    label = { Text("Поиск по названию") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                    items(filtered) { m ->
-                        val trailing: @Composable (() -> Unit)? = if (m == model) {
-                            { Icon(Icons.Default.Check, contentDescription = "Выбрана") }
-                        } else null
+                Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    filteredModels.forEach { item ->
                         ListItem(
-                            headlineContent = { Text(m) },
-                            trailingContent = trailing,
-                            modifier = Modifier.clickable {
-                                model = m
-                                showSheet = false
-                            }
+                            headlineContent = { Text(item) },
+                            trailingContent = if (item == model) {{ Icon(Icons.Default.Check, contentDescription = "Выбрана", tint = MaterialTheme.colorScheme.primary) }} else null,
+                            modifier = Modifier.clickable { model = item; showModelSheet = false }
                         )
                     }
-                }
-                if (filtered.isEmpty()) {
-                    Text(
-                        "Ничего не найдено",
+                    if (filteredModels.isEmpty()) Text(
+                        "Нет совпадений. Можно ввести ID модели вручную.",
+                        modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(8.dp)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(24.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    description: String,
+    content: @Composable Column.() -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            content()
         }
     }
 }

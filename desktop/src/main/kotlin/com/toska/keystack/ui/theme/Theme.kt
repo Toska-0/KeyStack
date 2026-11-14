@@ -69,18 +69,18 @@ fun KeyStackTheme(
             tertiary = accent,
             background = Color.Black,
             onBackground = Color(0xFFF4F1EE),
-            surface = Color.Black,
+            surface = Color(0xFF090A0D),
             onSurface = Color(0xFFF4F1EE),
-            surfaceVariant = Color(0xFF141414),
+            surfaceVariant = Color(0xFF14151A),
             onSurfaceVariant = Color(0xFFB8B2AD),
-            surfaceContainer = Color(0xFF0D0D0D),
-            surfaceContainerLow = Color(0xFF0A0A0A),
+            surfaceContainer = Color(0xFF0F1014),
+            surfaceContainerLow = Color(0xFF101116),
             surfaceContainerLowest = Color.Black,
-            surfaceContainerHigh = Color(0xFF141414),
-            surfaceContainerHighest = Color(0xFF1A1A1A),
+            surfaceContainerHigh = Color(0xFF191A20),
+            surfaceContainerHighest = Color(0xFF23242B),
             secondaryContainer = accent.copy(alpha = 0.22f),
             onSecondaryContainer = Color.White,
-            outline = accent.copy(alpha = 0.45f)
+            outline = Color(0xFF77727A)
         )
         darkTheme -> darkColorScheme(
             primary = accent,
@@ -90,20 +90,20 @@ fun KeyStackTheme(
             secondary = accent,
             onSecondary = Color.White,
             tertiary = accent,
-            background = Color(0xFF171717),
+            background = Color(0xFF17171A),
             onBackground = Color(0xFFF4F1EE),
-            surface = Color(0xFF1E1E1E),
+            surface = Color(0xFF1E1E22),
             onSurface = Color(0xFFF4F1EE),
-            surfaceVariant = Color(0xFF292929),
+            surfaceVariant = Color(0xFF29292E),
             onSurfaceVariant = Color(0xFFB8B2AD),
-            surfaceContainer = Color(0xFF202020),
-            surfaceContainerLow = Color(0xFF1B1B1B),
-            surfaceContainerLowest = Color(0xFF151515),
-            surfaceContainerHigh = Color(0xFF292929),
-            surfaceContainerHighest = Color(0xFF333333),
+            surfaceContainer = Color(0xFF202025),
+            surfaceContainerLow = Color(0xFF1B1B20),
+            surfaceContainerLowest = Color(0xFF151519),
+            surfaceContainerHigh = Color(0xFF29292E),
+            surfaceContainerHighest = Color(0xFF33333A),
             secondaryContainer = accent.copy(alpha = 0.22f),
             onSecondaryContainer = Color.White,
-            outline = accent.copy(alpha = 0.42f)
+            outline = Color(0xFF77727A)
         )
         else -> lightColorScheme(
             primary = accent,
@@ -125,7 +125,7 @@ fun KeyStackTheme(
             surfaceContainerHighest = Color(0xFFE6E1DC),
             secondaryContainer = accent.copy(alpha = 0.14f),
             onSecondaryContainer = Color(0xFF352018),
-            outline = accent.copy(alpha = 0.35f)
+            outline = Color(0xFF8A817B)
         )
     }
     MaterialTheme(colorScheme = colorScheme, content = content)
