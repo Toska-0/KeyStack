@@ -17,7 +17,7 @@ data class ReleaseInfo(
 )
 
 object ReleaseChecker {
-    const val CURRENT_VERSION = "0.1.0"
+    const val CURRENT_VERSION = "0.2.0"
     private const val LATEST_RELEASE_URL = "https://api.github.com/repos/Toska-0/KeyStack/releases/latest"
 
     suspend fun checkForUpdate(): ReleaseInfo? = withContext(Dispatchers.IO) {
