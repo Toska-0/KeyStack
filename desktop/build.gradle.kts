@@ -105,6 +105,10 @@ compose.desktop {
     }
 }
 
-tasks.matching { it.name.contains("packageMsi", ignoreCase = true) }.configureEach {
+// The icon must exist before both the distributable validation and MSI packaging.
+tasks.matching {
+    it.name.contains("createDistributable", ignoreCase = true) ||
+        it.name.contains("packageMsi", ignoreCase = true)
+}.configureEach {
     dependsOn(generateWindowsIcon)
 }
