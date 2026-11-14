@@ -11,6 +11,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.AtomicMoveNotSupportedException
+import java.util.Base64
+import com.sun.jna.platform.win32.Crypt32Util
 
 data class Settings(
     val providerId: String,
@@ -52,10 +57,31 @@ class SettingsStore(baseDir: File) {
     private val json = Json { ignoreUnknownKeys = true }
     private val mutex = Mutex()
 
-    private fun loadStored(): StoredSettings = try {
-        if (file.exists()) json.decodeFromString<StoredSettings>(file.readText()) else StoredSettings()
-    } catch (e: Exception) {
-        StoredSettings()
+    private fun isWindows() = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
+
+    private fun protectSecret(value: String): String {
+        if (value.isEmpty() || !isWindows()) return value
+        return "dpapi:" + Base64.getEncoder().encodeToString(
+            Crypt32Util.cryptProtectData(value.toByteArray(Charsets.UTF_8))
+        )
+    }
+
+    private fun revealSecret(value: String): String {
+        if (!value.startsWith("dpapi:")) return value
+        if (!isWindows()) return ""
+        return runCatching {
+            String(Crypt32Util.cryptUnprotectData(Base64.getDecoder().decode(value.removePrefix("dpapi:"))), Charsets.UTF_8)
+        }.getOrDefault("")
+    }
+
+    private fun loadStored(): StoredSettings {
+        if (!file.exists()) return StoredSettings()
+        return try {
+            val raw = json.decodeFromString<StoredSettings>(file.readText(Charsets.UTF_8))
+            raw.copy(keys = raw.keys.mapValues { (_, value) -> revealSecret(value) })
+        } catch (e: Exception) {
+            throw IllegalStateException("Не удалось прочитать settings.json. Файл не был изменён.", e)
+        }
     }
 
     private val _state = MutableStateFlow(loadStored())
@@ -83,12 +109,17 @@ class SettingsStore(baseDir: File) {
         val next = mutex.withLock {
             val updated = transform(_state.value)
             withContext(Dispatchers.IO) {
+                file.parentFile?.mkdirs()
+                val persisted = updated.copy(keys = updated.keys.mapValues { (_, value) -> protectSecret(value) })
+                val temp = File(file.parentFile, "settings.json.tmp")
+                val backup = File(file.parentFile, "settings.json.bak")
+                temp.writeText(json.encodeToString(persisted), Charsets.UTF_8)
+                if (file.exists()) Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
                 try {
-                    file.parentFile?.mkdirs()
-                    file.writeText(json.encodeToString(updated))
-                } catch (e: Exception) {
-                    // ignore write errors
-                }
+                    Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                } finally { if (temp.exists()) temp.delete() }
             }
             updated
         }
