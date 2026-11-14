@@ -199,8 +199,10 @@ class ChatViewModel {
 
         job = scope.launch {
             val workspacePrompt = withContext(Dispatchers.IO) { buildWorkspacePrompt(s.workspacePath) }
+            val webContext = WebSearch.searchForPrompt(history.lastOrNull()?.takeIf { it.role == "user" }?.content.orEmpty())
             val apiMessages = buildList {
                 if (workspacePrompt.isNotBlank()) add(ChatMessage("system", workspacePrompt))
+                if (webContext.isNotBlank()) add(ChatMessage("system", webContext))
                 addAll(history.map { ChatMessage(it.role, it.content, it.images) })
             }
             val sb = StringBuilder()
@@ -290,6 +292,8 @@ class ChatViewModel {
 
     fun branchFrom(messageIndex: Int) {
         if (_busy.value || messageIndex !in _messages.value.indices) return
+        val selected = _messages.value[messageIndex]
+        if (selected.role != "assistant" || selected.isStreaming || selected.content.isBlank()) return
         val source = _sessions.value.firstOrNull { it.id == _currentId.value } ?: return
         val prefix = _messages.value.take(messageIndex + 1)
         val now = System.currentTimeMillis()
