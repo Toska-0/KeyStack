@@ -11,6 +11,13 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 @Serializable
+data class AttachedFile(
+    val name: String,
+    val content: String = "",
+    val sizeBytes: Long = 0L
+)
+
+@Serializable
 data class StoredMessage(
     val role: String,
     val content: String,
@@ -18,7 +25,8 @@ data class StoredMessage(
     val id: String = "",
     val createdAt: Long = 0L,
     val generationMs: Long = 0L,
-    val tokenEstimate: Int = 0
+    val tokenEstimate: Int = 0,
+    val files: List<AttachedFile> = emptyList()
 )
 
 @Serializable
