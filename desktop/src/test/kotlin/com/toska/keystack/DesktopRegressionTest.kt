@@ -14,6 +14,7 @@ class DesktopRegressionTest {
     fun ordinaryPromptsDoNotTriggerWebSearch() {
         assertFalse(WebSearch.shouldSearch("Объясни, как работает оперативная память"))
         assertFalse(WebSearch.shouldSearch("Сравни два подхода к программированию"))
+        assertFalse(WebSearch.shouldSearch("Сегодня я устал и хочу отдохнуть"))
         assertTrue(WebSearch.shouldSearch("Найди последние новости о Kotlin"))
     }
 
