@@ -236,11 +236,18 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.mipmap.ic_launcher),
-                            contentDescription = "KeyStack",
-                            modifier = Modifier.size(34.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(Color.White, RoundedCornerShape(9.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.drawable.ic_launcher_foreground),
+                                contentDescription = "KeyStack",
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text("KeyStack", style = MaterialTheme.typography.titleMedium)
