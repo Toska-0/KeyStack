@@ -61,6 +61,10 @@ object Providers {
             "https://openrouter.ai/keys"
         ),
         Provider(
+            "kiro", "Kiro AI (Gateway)", "", ApiKind.OPENAI,
+            emptyList(), "https://github.com/xwteam/kiro2api", needsBaseUrl = true
+        ),
+        Provider(
             "custom", "Custom (OpenAI-compatible)", "", ApiKind.OPENAI,
             emptyList(), "", needsBaseUrl = true
         )
