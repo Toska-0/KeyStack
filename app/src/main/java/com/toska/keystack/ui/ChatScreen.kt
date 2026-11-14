@@ -102,6 +102,7 @@ import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
+import com.toska.keystack.ReleaseInfo
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
 import com.toska.keystack.ui.theme.KeyStackMark
@@ -115,7 +116,13 @@ data class PendingFile(val name: String, val text: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
+fun ChatScreen(
+    vm: ChatViewModel,
+    onOpenSettings: () -> Unit,
+    releaseInfo: ReleaseInfo? = null,
+    onDismissRelease: () -> Unit = {},
+    onOpenRelease: (String) -> Unit = {}
+) {
     val messages by vm.messages.collectAsState()
     val busy by vm.busy.collectAsState()
     val error by vm.error.collectAsState()
@@ -696,6 +703,28 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             },
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    releaseInfo?.let { release ->
+        AlertDialog(
+            onDismissRequest = onDismissRelease,
+            title = { Text("Доступна новая версия") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(release.name, style = MaterialTheme.typography.titleMedium)
+                    Text("Установлена: ${ReleaseChecker.CURRENT_VERSION}  ·  Доступна: ${release.tagName}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(release.body.ifBlank { "Вышло новое обновление KeyStack. Подробности доступны на странице релиза." },
+                        style = MaterialTheme.typography.bodyMedium, maxLines = 12, overflow = TextOverflow.Ellipsis)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onOpenRelease(release.htmlUrl) }) { Text("Обновить") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissRelease) { Text("Позже") }
             }
         )
     }
