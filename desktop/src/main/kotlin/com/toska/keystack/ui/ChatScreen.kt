@@ -129,12 +129,30 @@ import java.awt.dnd.DropTargetAdapter
 import java.awt.dnd.DropTargetDropEvent
 import java.awt.image.BufferedImage
 import java.io.File
+import java.util.zip.ZipFile
+import org.apache.pdfbox.Loader
+import org.apache.pdfbox.text.PDFTextStripper
 import javax.imageio.ImageIO
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 
 /** Файл-вложение: имя + прочитанный текст. */
 data class PendingFile(val name: String, val text: String, val path: String = "")
+
+private fun extractFileText(file: File): String = runCatching {
+    when (file.extension.lowercase()) {
+        "pdf" -> Loader.loadPDF(file).use { PDFTextStripper().getText(it).take(200_000) }
+        "docx" -> ZipFile(file).use { zip ->
+            val entry = zip.getEntry("word/document.xml") ?: return@use ""
+            val xml = zip.getInputStream(entry).bufferedReader(Charsets.UTF_8).use { it.readText() }
+            Regex("<w:t[^>]*>([^<]*)</w:t>").findAll(xml).joinToString(" ") { it.groupValues[1] }.take(200_000)
+        }
+        else -> {
+            val extensions = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
+            if (file.extension.lowercase() in extensions && file.length() <= 2_000_000L) file.readText(Charsets.UTF_8).take(200_000) else ""
+        }
+    }
+}.getOrDefault("")
 
 /** Диалог выбора картинок: возвращает data URI вида "data:image/jpeg;base64,...". */
 suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
@@ -174,8 +192,7 @@ suspend fun pickDocuments(): List<PendingFile> = withContext(Dispatchers.Swing) 
         (chooser.selectedFiles.toList().ifEmpty { listOfNotNull(chooser.selectedFile) }).mapNotNull { file ->
             runCatching {
                 require(file.isFile && file.length() <= 20_000_000L)
-                val textExtensions = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
-                val content = if (file.extension.lowercase() in textExtensions && file.length() <= 2_000_000L) file.readText(Charsets.UTF_8).take(200_000) else ""
+                val content = extractFileText(file)
                 PendingFile(file.name, content, file.absolutePath)
             }.getOrNull()
         }
@@ -203,9 +220,7 @@ private suspend fun readDroppedFiles(files: List<File>): Pair<List<String>, List
                 }
             }
             else -> {
-                val textExtensions = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
-                val content = if (file.extension.lowercase() in textExtensions && file.length() <= 2_000_000L) file.readText(Charsets.UTF_8).take(200_000) else ""
-                if (file.length() <= 20_000_000L) docs += PendingFile(file.name, content, file.absolutePath)
+                if (file.length() <= 20_000_000L) docs += PendingFile(file.name, extractFileText(file), file.absolutePath)
             }
         }
     } }
