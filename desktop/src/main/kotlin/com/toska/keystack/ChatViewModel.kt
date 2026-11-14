@@ -59,6 +59,20 @@ class ChatViewModel {
     val tokenEstimate: StateFlow<Int> = _tokenEstimate
     private val _recoverablePrompt = MutableStateFlow<String?>(null)
     val recoverablePrompt: StateFlow<String?> = _recoverablePrompt
+    private val _pendingWorkspaceWrites = MutableStateFlow<List<ProposedWorkspaceWrite>>(emptyList())
+    val pendingWorkspaceWrites: StateFlow<List<ProposedWorkspaceWrite>> = _pendingWorkspaceWrites
+
+    fun approveWorkspaceWrite(index: Int) {
+        val proposal = _pendingWorkspaceWrites.value.getOrNull(index) ?: return
+        val path = _settings.value.workspacePath
+        scope.launch(Dispatchers.IO) {
+            val result = applyWorkspaceWrite(path, proposal)
+            _pendingWorkspaceWrites.value = _pendingWorkspaceWrites.value.filterNot { it == proposal }
+            _error.value = result
+        }
+    }
+
+    fun rejectWorkspaceWrites() { _pendingWorkspaceWrites.value = emptyList() }
 
     fun init(settingsStore: SettingsStore, chatStore: ChatStore) {
         if (initialized) return
@@ -70,7 +84,10 @@ class ChatViewModel {
             settingsStore.settings.collect { _settings.value = it }
         }
         scope.launch {
-            val loaded = chatStore.load()
+            val loaded = runCatching { chatStore.load() }.getOrElse {
+                _error.value = "Не удалось загрузить историю: ${it.message ?: "ошибка файла"}"
+                emptyList()
+            }
             _sessions.value = loaded
             val first = loaded.firstOrNull { it.pinned } ?: loaded.firstOrNull()
             _currentId.value = first?.id
@@ -142,13 +159,14 @@ class ChatViewModel {
     }
 
     fun deleteChat(id: String) {
-        stop()
         val wasCurrent = _currentId.value == id
+        if (wasCurrent) stop()
         _sessions.value = _sessions.value.filter { it.id != id }
         if (wasCurrent) {
             val next = _sessions.value.firstOrNull()
             _currentId.value = next?.id
             _messages.value = next?.messages?.map { UiMessage(it.role, it.content, images = it.images, files = it.files) } ?: emptyList()
+            _recoverablePrompt.value = next?.pendingPrompt
         }
         persist()
     }
@@ -171,7 +189,7 @@ class ChatViewModel {
                     val t = text.trim().ifBlank { files.firstOrNull()?.name ?: "Вложение" }
                     t.take(40) + if (t.length > 40) "…" else ""
                 } else it.title
-                it.copy(title = newTitle, updatedAt = System.currentTimeMillis(), messages = stored, pendingPrompt = text.trim())
+                it.copy(title = newTitle, updatedAt = System.currentTimeMillis(), messages = stored, pendingPrompt = text.trim(), pendingImages = images, pendingFiles = files)
             } else it
         }
         persist()
@@ -213,7 +231,15 @@ class ChatViewModel {
                 })
             }
             val sb = StringBuilder()
-            val candidates = listOf(Triple(Providers.byId(s.providerId), s.apiKey, Triple(s.model, s.baseUrl, false)))
+            val candidates = buildList {
+                add(Triple(Providers.byId(s.providerId), s.apiKey, s.model to s.baseUrl))
+                s.savedKeys.forEach { (providerId, key) ->
+                    if (providerId != s.providerId && key.isNotBlank()) {
+                        val fallbackModel = s.savedModels[providerId].orEmpty()
+                        if (fallbackModel.isNotBlank()) add(Triple(Providers.byId(providerId), key, fallbackModel to s.savedBaseUrls[providerId].orEmpty()))
+                    }
+                }
+            }
             var succeeded = false
             var lastFailure: String? = null
             for ((index, candidate) in candidates.withIndex()) {
@@ -254,12 +280,9 @@ class ChatViewModel {
                 _apiStatus.value = "Нет подключения к API"
             }
             val final = sb.toString()
-            val (visibleAnswer, fileResults) = withContext(Dispatchers.IO) {
-                applyWorkspaceWrites(s.workspacePath, final)
-            }
-            val completedAnswer = if (fileResults.isEmpty()) visibleAnswer else {
-                visibleAnswer.trimEnd() + "\n\n" + fileResults.joinToString("\n") { "✓ $it" }
-            }
+            val (visibleAnswer, proposedWrites) = extractWorkspaceWrites(final)
+            _pendingWorkspaceWrites.value = proposedWrites
+            val completedAnswer = visibleAnswer
             val elapsed = System.currentTimeMillis() - startedAt
             _generationMs.value = elapsed
             _messages.value = if (final.isBlank() && _error.value != null) {
@@ -268,7 +291,7 @@ class ChatViewModel {
                 _messages.value.dropLast(1) + UiMessage("assistant", completedAnswer, generationMs = elapsed, tokenEstimate = estimateTokens(completedAnswer))
             }
             _busy.value = false
-            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null) else it }
+            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null, pendingImages = emptyList(), pendingFiles = emptyList()) else it }
             _recoverablePrompt.value = null
             persistCurrentMessages()
         }
@@ -322,11 +345,12 @@ class ChatViewModel {
     }
 
     fun recoverInterruptedRequest() {
+        val session = _sessions.value.firstOrNull { it.id == _currentId.value } ?: return
         val prompt = _recoverablePrompt.value ?: return
         _recoverablePrompt.value = null
-        _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null) else it }
+        _sessions.value = _sessions.value.map { if (it.id == session.id) it.copy(pendingPrompt = null, pendingImages = emptyList(), pendingFiles = emptyList()) else it }
         persist()
-        send(prompt)
+        send(prompt, session.pendingImages, session.pendingFiles)
     }
 
     private fun estimateTokens(text: String): Int = if (text.isBlank()) 0 else ((text.length + 3) / 4).coerceAtLeast(1)
@@ -351,7 +375,8 @@ class ChatViewModel {
         val last = list.lastOrNull()
         if (last?.isStreaming == true) {
             _messages.value = list.dropLast(1) + last.copy(isStreaming = false)
-            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = list.dropLast(1).lastOrNull { m -> m.role == "user" }?.content) else it }
+            val lastUser = list.dropLast(1).lastOrNull { it.role == "user" }
+            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = lastUser?.content, pendingImages = lastUser?.images.orEmpty(), pendingFiles = lastUser?.files.orEmpty()) else it }
             _recoverablePrompt.value = _sessions.value.firstOrNull { it.id == _currentId.value }?.pendingPrompt
         }
         if (::chatStore.isInitialized) persistCurrentMessages()
@@ -362,6 +387,9 @@ class ChatViewModel {
         _messages.value = emptyList()
         _error.value = null
         _busy.value = false
+        _recoverablePrompt.value = null
+        _pendingWorkspaceWrites.value = emptyList()
+        _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = null, pendingImages = emptyList(), pendingFiles = emptyList()) else it }
         if (::chatStore.isInitialized) persistCurrentMessages()
     }
 
