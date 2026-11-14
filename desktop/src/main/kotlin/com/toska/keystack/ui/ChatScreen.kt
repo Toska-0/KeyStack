@@ -100,6 +100,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.toska.keystack.ChatSession
@@ -218,7 +219,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val scope = rememberCoroutineScope()
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
-    var messageSearch by remember { mutableStateOf("") }
     var editMessageTarget by remember { mutableStateOf<Int?>(null) }
     var editMessageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -226,6 +226,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
     var deleteTarget by remember { mutableStateOf<ChatSession?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var sessionMenuId by remember { mutableStateOf<String?>(null) }
 
     // Вложения
     var pendingImages by remember { mutableStateOf(listOf<String>()) }
@@ -308,7 +309,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         // Постоянная навигационная панель — структура повторяет референс Vibe.
         Column(
             Modifier.width(202.dp).fillMaxHeight()
-                .background(Color(0xFF151517))
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .padding(horizontal = 12.dp)
         ) {
             Row(
@@ -316,20 +317,21 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(23.dp)
-                        .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(5.dp)),
+                    modifier = Modifier.size(27.dp).background(Color.White, RoundedCornerShape(7.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    KeyStackMark(Modifier.size(16.dp))
+                    Text("K", style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 21.sp, fontWeight = FontWeight.Black,
+                        brush = Brush.linearGradient(MistralGradient)
+                    ))
                 }
                 Spacer(Modifier.width(9.dp))
-                Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF4F4F5))
+                Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             }
             Spacer(Modifier.height(9.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth().height(34.dp)
-                    .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(8.dp))
+                    .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.78f))), RoundedCornerShape(8.dp))
                     .clickable { vm.newChat() },
                 color = Color.Transparent, shape = RoundedCornerShape(8.dp)
             ) {
@@ -341,38 +343,55 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
             }
             Spacer(Modifier.height(7.dp))
                         Spacer(Modifier.height(18.dp))
-            Text("НЕДАВНИЕ ЧАТЫ", color = Color(0xFF9A9AA1), style = MaterialTheme.typography.labelSmall,
+            Text("НЕДАВНИЕ ЧАТЫ", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(start = 8.dp, bottom = 9.dp))
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 // Сортировка по времени создания не перемещает чат после каждого нового сообщения.
                 val stableSessions = sessions.sortedByDescending { it.createdAt }
                 items(stableSessions, key = { it.id }) { session ->
                     Row(
-                        Modifier.fillMaxWidth().height(36.dp)
-                            .background(if (session.id == currentId) Color(0xFF33261D) else Color.Transparent, RoundedCornerShape(7.dp))
+                        Modifier.fillMaxWidth().height(38.dp)
+                            .background(if (session.id == currentId) MaterialTheme.colorScheme.primary.copy(alpha = 0.17f) else Color.Transparent, RoundedCornerShape(8.dp))
                             .clickable { vm.selectChat(session.id) }
-                            .padding(horizontal = 9.dp),
+                            .padding(start = 9.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(session.title, color = Color(0xFFE3E3E6), style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+                        Text(session.title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Box {
+                            IconButton(onClick = { sessionMenuId = session.id }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Действия с чатом",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(17.dp))
+                            }
+                            DropdownMenu(expanded = sessionMenuId == session.id, onDismissRequest = { sessionMenuId = null }) {
+                                DropdownMenuItem(text = { Text("Переименовать") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = { sessionMenuId = null; renameText = session.title; renameTarget = session })
+                                DropdownMenuItem(text = { Text(if (session.pinned) "Открепить" else "Закрепить") },
+                                    leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) },
+                                    onClick = { sessionMenuId = null; vm.togglePin(session.id) })
+                                DropdownMenuItem(text = { Text("Удалить") },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    onClick = { sessionMenuId = null; deleteTarget = session })
+                            }
+                        }
                     }
                 }
             }
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { onOpenSettings() },
-                color = Color(0xFF202023), shape = RoundedCornerShape(9.dp)
+                color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(9.dp)
             ) {
                 Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(color = Color(0xFF39393F), shape = CircleShape, modifier = Modifier.size(27.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Text("K", color = Color.White, style = MaterialTheme.typography.labelSmall) }
+                    Surface(color = MaterialTheme.colorScheme.primary, shape = CircleShape, modifier = Modifier.size(27.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Text("K", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)) }
                     }
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("KeyStack", color = Color.White, style = MaterialTheme.typography.labelMedium)
-                        Text(provider.name, color = Color(0xFF9B9BA2), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Text("KeyStack", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelMedium)
+                        Text(provider.name, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
-                    Text("⚙", color = Color(0xFFB8B8BD))
+                    Text("⚙", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -426,27 +445,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (messages.isNotEmpty()) {
-                OutlinedTextField(
-                    value = messageSearch,
-                    onValueChange = { messageSearch = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                    singleLine = true,
-                    placeholder = { Text("Поиск в переписке") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (messageSearch.isNotBlank()) TextButton(onClick = { messageSearch = "" }) { Text("Очистить") }
-                    }
-                )
-                if (messageSearch.isNotBlank()) {
-                    Text(
-                        "Найдено сообщений: ${vm.searchInConversation(messageSearch).size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
-                    )
-                }
-            }
             if (messages.isEmpty()) {
                 Column(
                     Modifier.fillMaxSize().padding(horizontal = 24.dp),
@@ -456,7 +454,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     Box(
                         modifier = Modifier
                             .size(52.dp)
-                            .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(15.dp)),
+                            .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.78f))), RoundedCornerShape(15.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         KeyStackMark(Modifier.size(32.dp))
@@ -509,16 +507,17 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         itemsIndexed(messages) { idx, msg ->
-                            if (messageSearch.isBlank() || msg.content.contains(messageSearch, ignoreCase = true)) MessageBubble(msg = msg, isLastAssistant = idx == lastAssistantIdx, busy = busy,
+                            MessageBubble(
+                                msg = msg,
+                                isLastAssistant = idx == lastAssistantIdx,
+                                busy = busy,
                                 onRegenerate = { vm.regenerate() },
-                                onEdit = {
-                                    editMessageText = msg.content
-                                    editMessageTarget = idx
-                                },
+                                onEdit = { editMessageText = msg.content; editMessageTarget = idx },
                                 onBranch = { vm.branchFrom(idx) },
                                 fontScale = settings.fontScale,
                                 maxWidth = settings.messageWidth,
-                                animationsEnabled = settings.animationsEnabled)
+                                animationsEnabled = settings.animationsEnabled
+                            )
                         }
                     }
                     error?.let { err ->
@@ -791,7 +790,7 @@ private fun ComposerBar(
     ) {
         Box {
             IconButton(onClick = onAttach, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Default.Add, contentDescription = "Добавить вложение", tint = Color(0xFFE6E6E8))
+                Icon(Icons.Default.Add, contentDescription = "Добавить вложение", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             DropdownMenu(expanded = attachMenu, onDismissRequest = onDismissAttach) {
                 DropdownMenuItem(text = { Text("Фото / картинка") }, onClick = { onDismissAttach(); onPickImages() })
@@ -1035,7 +1034,7 @@ fun MessageBubble(
             modifier = if (animationsEnabled) Modifier.animateContentSize(tween(180)) else Modifier,
             color = if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
             shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(18.dp),
-            border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF34343A))
+            border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
         ) {
             if (msg.isStreaming && msg.content.isEmpty()) {
                 TypingDots()
