@@ -215,6 +215,11 @@ class ChatViewModel {
         _tokenEstimate.value = history.sumOf { estimateTokens(it.content) }
         _busy.value = true
         _error.value = null
+        val requestUser = history.lastOrNull { it.role == "user" }
+        if (requestUser != null) {
+            _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = requestUser.content, pendingImages = requestUser.images, pendingFiles = requestUser.files) else it }
+            persist()
+        }
 
         job = scope.launch {
             val workspacePrompt = withContext(Dispatchers.IO) { buildWorkspacePrompt(s.workspacePath) }
@@ -222,12 +227,12 @@ class ChatViewModel {
             val apiMessages = buildList {
                 if (workspacePrompt.isNotBlank()) add(ChatMessage("system", workspacePrompt))
                 if (webContext.isNotBlank()) add(ChatMessage("system", webContext))
-                addAll(history.takeLast(40).map { message ->
+                addAll(history.takeLast(24).map { message ->
                     val fileContext = message.files.joinToString("\n\n") { file ->
                         if (file.content.isBlank()) "Attached file: ${file.name} (content preview unavailable)"
-                        else "Attached file: ${file.name}\n```text\n${file.content.take(30_000)}\n```"
+                        else "Attached file: ${file.name}\n```text\n${file.content.take(12_000)}\n```"
                     }
-                    ChatMessage(message.role, if (fileContext.isBlank()) message.content.takeLast(80_000) else listOf(message.content.takeLast(80_000), fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
+                    ChatMessage(message.role, if (fileContext.isBlank()) message.content.takeLast(12_000) else listOf(message.content.takeLast(80_000), fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
                 })
             }
             val sb = StringBuilder()
