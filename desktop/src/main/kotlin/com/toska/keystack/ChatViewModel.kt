@@ -18,7 +18,8 @@ data class UiMessage(
     val id: String = System.nanoTime().toString(),
     val createdAt: Long = System.currentTimeMillis(),
     val generationMs: Long = 0L,
-    val tokenEstimate: Int = 0
+    val tokenEstimate: Int = 0,
+    val files: List<AttachedFile> = emptyList()
 )
 
 /** Десктоп-версия ViewModel: обычный класс со своей coroutine-областью (без androidx.lifecycle). */
@@ -73,7 +74,7 @@ class ChatViewModel {
             _sessions.value = loaded
             val first = loaded.firstOrNull { it.pinned } ?: loaded.firstOrNull()
             _currentId.value = first?.id
-            _messages.value = first?.messages?.map { UiMessage(it.role, it.content, images = it.images, id = it.id.ifBlank { System.nanoTime().toString() }, createdAt = it.createdAt, generationMs = it.generationMs, tokenEstimate = it.tokenEstimate) } ?: emptyList()
+            _messages.value = first?.messages?.map { UiMessage(it.role, it.content, images = it.images, id = it.id.ifBlank { System.nanoTime().toString() }, createdAt = it.createdAt, generationMs = it.generationMs, tokenEstimate = it.tokenEstimate, files = it.files) } ?: emptyList()
             _recoverablePrompt.value = first?.pendingPrompt
         }
     }
@@ -85,7 +86,7 @@ class ChatViewModel {
 
     private fun persistCurrentMessages() {
         val id = _currentId.value ?: return
-        val stored = _messages.value.filter { !it.isStreaming }.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate) }
+        val stored = _messages.value.filter { !it.isStreaming }.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate, it.files) }
         _sessions.value = _sessions.value.map {
             if (it.id == id) it.copy(updatedAt = System.currentTimeMillis(), messages = stored) else it
         }
@@ -120,7 +121,7 @@ class ChatViewModel {
         stop()
         _currentId.value = id
         _messages.value = _sessions.value.firstOrNull { it.id == id }
-            ?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
+            ?.messages?.map { UiMessage(it.role, it.content, images = it.images, files = it.files) } ?: emptyList()
         _error.value = null
         _recoverablePrompt.value = _sessions.value.firstOrNull { it.id == id }?.pendingPrompt
     }
@@ -147,23 +148,23 @@ class ChatViewModel {
         if (wasCurrent) {
             val next = _sessions.value.firstOrNull()
             _currentId.value = next?.id
-            _messages.value = next?.messages?.map { UiMessage(it.role, it.content, images = it.images) } ?: emptyList()
+            _messages.value = next?.messages?.map { UiMessage(it.role, it.content, images = it.images, files = it.files) } ?: emptyList()
         }
         persist()
     }
 
-    fun send(text: String, images: List<String> = emptyList()) {
+    fun send(text: String, images: List<String> = emptyList(), files: List<AttachedFile> = emptyList()) {
         val s = _settings.value
-        if ((text.isBlank() && images.isEmpty()) || _busy.value || s.apiKey.isBlank() || s.model.isBlank()) return
+        if ((text.isBlank() && images.isEmpty() && files.isEmpty()) || _busy.value || s.apiKey.isBlank() || s.model.isBlank()) return
 
         var session = _sessions.value.firstOrNull { it.id == _currentId.value }
         if (session == null) session = openSession(s.providerId, s.model)
         val sessionId = session.id
 
-        val user = UiMessage("user", text.trim(), images = images, tokenEstimate = estimateTokens(text))
+        val user = UiMessage("user", text.trim(), images = images, files = files, tokenEstimate = estimateTokens(text))
         val history = _messages.value + user
 
-        val stored = history.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate) }
+        val stored = history.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate, it.files) }
         _sessions.value = _sessions.value.map {
             if (it.id == sessionId) {
                 val newTitle = if (it.title == "Новый чат") {
@@ -203,7 +204,13 @@ class ChatViewModel {
             val apiMessages = buildList {
                 if (workspacePrompt.isNotBlank()) add(ChatMessage("system", workspacePrompt))
                 if (webContext.isNotBlank()) add(ChatMessage("system", webContext))
-                addAll(history.map { ChatMessage(it.role, it.content, it.images) })
+                addAll(history.map { message ->
+                    val fileContext = message.files.joinToString("\n\n") { file ->
+                        if (file.content.isBlank()) "Attached file: ${file.name} (content preview unavailable)"
+                        else "Attached file: ${file.name}\n```text\n${file.content.take(100_000)}\n```"
+                    }
+                    ChatMessage(message.role, if (fileContext.isBlank()) message.content else listOf(message.content, fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
+                })
             }
             val sb = StringBuilder()
             val candidates = listOf(Triple(Providers.byId(s.providerId), s.apiKey, Triple(s.model, s.baseUrl, false)))
@@ -304,7 +311,7 @@ class ChatViewModel {
             updatedAt = now,
             providerId = source.providerId,
             model = source.model,
-            messages = prefix.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate) },
+            messages = prefix.map { StoredMessage(it.role, it.content, it.images, it.id, it.createdAt, it.generationMs, it.tokenEstimate, it.files) },
             parentSessionId = source.id,
             branchMessageId = prefix.lastOrNull()?.id
         )
