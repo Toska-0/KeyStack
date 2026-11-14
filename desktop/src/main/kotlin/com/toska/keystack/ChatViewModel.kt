@@ -322,13 +322,6 @@ class ChatViewModel {
         send(prompt)
     }
 
-    fun searchInConversation(query: String): List<Int> {
-        if (query.isBlank()) return emptyList()
-        return _messages.value.mapIndexedNotNull { index, message ->
-            index.takeIf { message.content.contains(query, ignoreCase = true) }
-        }
-    }
-
     private fun estimateTokens(text: String): Int = if (text.isBlank()) 0 else ((text.length + 3) / 4).coerceAtLeast(1)
 
     /** Переключить активного провайдера (ключ должен быть сохранён в настройках). */
