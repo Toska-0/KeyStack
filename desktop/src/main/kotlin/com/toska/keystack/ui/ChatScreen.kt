@@ -109,6 +109,7 @@ import com.toska.keystack.Providers
 import com.toska.keystack.ProviderQuota
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
+import com.toska.keystack.ui.theme.KeyStackMark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -320,7 +321,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(5.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
+                    KeyStackMark(Modifier.size(16.dp))
                 }
                 Spacer(Modifier.width(9.dp))
                 Text("KeyStack", style = MaterialTheme.typography.titleMedium, color = Color(0xFFF4F4F5))
@@ -458,7 +459,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(15.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("K", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+                        KeyStackMark(Modifier.size(32.dp))
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Добро пожаловать. С чего начнём?",
@@ -818,7 +819,7 @@ private fun ComposerBar(
                 modifier = Modifier
                     .size(38.dp)
                     .background(
-                        if (enabled) Brush.linearGradient(MistralGradient) else SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        if (enabled) SolidColor(MaterialTheme.colorScheme.primary) else SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
                         CircleShape
                     )
                     .clickable(enabled = enabled, onClick = onSend),
@@ -852,9 +853,9 @@ private fun VibeWelcomePanel(
     ) {
         Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = Color(0xFFFF5A1F), shape = RoundedCornerShape(8.dp), modifier = Modifier.size(34.dp)) {
+                Surface(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(34.dp)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("K", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                        KeyStackMark(Modifier.size(22.dp))
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -899,7 +900,7 @@ private fun VibeWelcomePanel(
                             modifier = Modifier.padding(horizontal = 17.dp, vertical = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(number, color = Color(0xFFFF5A1F), style = MaterialTheme.typography.labelLarge)
+                            Text(number, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                             Spacer(Modifier.width(16.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(title, style = MaterialTheme.typography.titleSmall)
@@ -1027,7 +1028,7 @@ fun MessageBubble(
     ) {
         Surface(
             modifier = if (animationsEnabled) Modifier.animateContentSize(tween(180)) else Modifier,
-            color = if (isUser) Color(0xFF39251F) else Color(0xFF202024),
+            color = if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
             shape = if (isUser) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(18.dp),
             border = if (isUser) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF34343A))
         ) {
@@ -1045,7 +1046,7 @@ fun MessageBubble(
                     SelectionContainer {
                         Text(
                             msg.content + if (msg.isStreaming) " ▌" else "",
-                            color = if (isUser) Color(0xFFFFE4D8) else Color(0xFFE8E8EC),
+                            color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = (15f * fontScale).sp, lineHeight = (23f * fontScale).sp)
                         )
                     }
