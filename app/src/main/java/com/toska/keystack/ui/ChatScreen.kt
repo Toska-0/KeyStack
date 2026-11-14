@@ -953,7 +953,7 @@ fun MessageBubble(
                     MessageRichContent(
                         content = msg.content,
                         streaming = msg.isStreaming,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (isUser) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
                         fontScale = fontScale
                     )
                 }
