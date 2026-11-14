@@ -88,7 +88,7 @@ class ChatStore(baseDir: File) {
     suspend fun load(): List<ChatSession> = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext emptyList()
         val backup = File(file.parentFile, "chats.json.bak")
-        fun decode(source: File): List<ChatSession> = json.decodeFromString<List<ChatSession>>(source.readText(Charsets.UTF_8))
+        fun decode(source: File): List<ChatSession> = json.decodeFromString<List<ChatSession>>(source.readText(Charsets.UTF_8)).map { session -> mapImages(session, ::imageFromDisk) }
         try { decode(file) } catch (primary: Exception) {
             if (backup.exists()) {
                 try {
