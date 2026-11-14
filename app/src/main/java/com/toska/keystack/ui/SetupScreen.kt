@@ -63,6 +63,7 @@ import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.Settings
 import com.toska.keystack.ui.theme.MistralGradient
+import com.toska.keystack.ui.theme.KeyStackMark
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -152,7 +153,7 @@ fun SetupScreen(
                             .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("K", color = Color.White, style = MaterialTheme.typography.titleSmall)
+                        KeyStackMark(Modifier.size(18.dp))
                     }
                 },
                 actions = {
