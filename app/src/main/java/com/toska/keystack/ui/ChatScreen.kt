@@ -95,9 +95,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.toska.keystack.AttachedFile
 import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
@@ -205,9 +207,13 @@ fun ChatScreen(
                                 val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                                 if (idx >= 0 && c.moveToFirst()) c.getString(idx) else "файл"
                             } ?: "файл"
-                            val text = context.contentResolver.openInputStream(uri)?.use { stream ->
-                                stream.readBytes().toString(Charsets.UTF_8).take(100_000)
+                            val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                                stream.readBytes()
                             } ?: return@mapNotNull null
+                            if (bytes.size > 2_000_000) return@runCatching null
+                            val textExtensions = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
+                            val extension = name.substringAfterLast('.', "").lowercase()
+                            val text = if (extension in textExtensions) bytes.toString(Charsets.UTF_8).take(100_000) else ""
                             PendingFile(name, text)
                         }.getOrNull()
                     }
@@ -486,7 +492,7 @@ fun ChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Файл (текст)") },
+                                text = { Text("Файл") },
                                 leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
                                 onClick = {
                                     attachMenu = false
@@ -529,11 +535,7 @@ fun ChatScreen(
                                     CircleShape
                                 )
                                 .clickable(enabled = canSend) {
-                                    val fileBlock = pendingFiles.joinToString("\n\n") { f ->
-                                        "Файл: ${f.name}\n```\n${f.text}\n```"
-                                    }
-                                    val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
-                                    vm.send(fullText, pendingImages)
+                                    vm.send(input, pendingImages, pendingFiles.map { AttachedFile(it.name, it.text) })
                                     input = ""
                                     pendingImages = emptyList()
                                     pendingFiles = emptyList()
@@ -931,18 +933,29 @@ fun MessageBubble(
             } else {
                 Column(Modifier.padding(if (isUser) 14.dp else 4.dp).widthIn(max = maxWidth.dp)) {
                     if (isUser && msg.images.isNotEmpty()) {
-                        Text(
-                            "📷 Фото: ${msg.images.size}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Text("📷 Фото: ${msg.images.size}", style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(4.dp))
                     }
-                    SelectionContainer {
-                        Text(
-                            msg.content + if (msg.isStreaming) " ▌" else "",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * fontScale)
-                        )
+                    if (isUser && msg.files.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            msg.files.forEach { file ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(7.dp))
+                                    Text(file.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (file.content.isBlank()) "Файл" else "Текст · ${file.content.length} симв.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
                     }
+                    MessageRichContent(
+                        content = msg.content,
+                        streaming = msg.isStreaming,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontScale = fontScale
+                    )
                 }
             }
         }
@@ -1009,6 +1022,62 @@ fun MessageBubble(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MessageRichContent(content: String, streaming: Boolean, color: Color, fontScale: Float) {
+    val clipboard = LocalClipboardManager.current
+    val codePattern = Regex("(?s)```([\\w.+#-]*)\\s*\\n(.*?)(?:```|$)")
+    val blocks = codePattern.findAll(content).toList()
+    if (blocks.isEmpty()) {
+        SelectionContainer {
+            Text(content + if (streaming) " ▌" else "", color = color,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale,
+                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * fontScale
+                ))
+        }
+        return
+    }
+    var cursor = 0
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        blocks.forEach { block ->
+            val before = content.substring(cursor, block.range.first)
+            if (before.isNotEmpty()) SelectionContainer {
+                Text(before, color = color, style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale,
+                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * fontScale
+                ))
+            }
+            val language = block.groupValues[1].ifBlank { "Код" }
+            val code = block.groupValues[2].trimEnd()
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))) {
+                Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(language.uppercase(), style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Скопировать код") }
+                    }
+                    SelectionContainer {
+                        Text(code + if (streaming && block.range.last == content.lastIndex) " ▌" else "",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = (13f * fontScale).sp, lineHeight = (19f * fontScale).sp))
+                    }
+                }
+            }
+            cursor = block.range.last + 1
+        }
+        if (cursor < content.length) SelectionContainer {
+            Text(content.substring(cursor) + if (streaming) " ▌" else "", color = color,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * fontScale,
+                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * fontScale
+                ))
         }
     }
 }
