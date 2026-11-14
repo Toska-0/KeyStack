@@ -22,7 +22,7 @@ object WebSearch {
 
     // Only explicit search intent triggers a network request; ordinary explanations stay local.
     private val intentPattern = Regex(
-        "(?iu)(\\bнайди\\b|\\bнайти\\b|\\bпоищи\\b|\\bпоиск\\b|\\bв интернете\\b|\\bв сети\\b|\\bисточники\\b|\\bссылки\\b|\\bновости\\b|\\bсегодня\\b|\\bсейчас\\b|\\bактуальн\\w*\\b|\\bпоследн\\w*\\b|\\bна данный момент\\b|\\bкурс валют\\b|\\bпогода\\b|\\bцена сейчас\\b|\\bсколько стоит сейчас\\b|\\bгде находится\\b|\\bsearch for\\b|\\blook up\\b|\\blatest\\b|\\bcurrent\\b|\\btoday\\b|\\bnews\\b|\\bweather\\b)"
+        "(?iu)(\\bнайди\\b|\\bнайти\\b|\\bпоищи\\b|\\bпоиск\\b|\\bв интернете\\b|\\bв сети\\b|\\bисточники\\b|\\bссылки\\b|\\bновости\\b|\\bактуальн\\w*\\b|\\bпоследн\\w*\\b|\\bна данный момент\\b|\\bкурс валют\\b|\\bпогода\\b|\\bцена сейчас\\b|\\bсколько стоит сейчас\\b|\\bгде находится\\b|\\bsearch for\\b|\\blook up\\b|\\blatest\\b|\\bcurrent\\b|\\btoday\\b|\\bnews\\b|\\bweather\\b)"
     )
 
     fun shouldSearch(query: String): Boolean =
