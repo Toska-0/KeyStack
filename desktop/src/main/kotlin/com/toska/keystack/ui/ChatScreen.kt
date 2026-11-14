@@ -326,10 +326,6 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-    }
-
     val currentSession = sessions.firstOrNull { it.id == currentId }
     val provider = Providers.byId(settings.providerId)
     val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" && !it.isStreaming }
@@ -533,7 +529,7 @@ vm.send(input, pendingImages, pendingFiles.map { AttachedFile(it.name, it.text) 
                         contentPadding = PaddingValues(horizontal = 28.dp, vertical = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
-                        itemsIndexed(messages) { idx, msg ->
+                        itemsIndexed(messages, key = { index, _ -> index }) { idx, msg ->
                             MessageBubble(
                                 msg = msg,
                                 isLastAssistant = idx == lastAssistantIdx,
