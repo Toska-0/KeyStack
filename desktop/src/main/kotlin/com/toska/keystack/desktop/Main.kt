@@ -48,7 +48,7 @@ fun main() = application {
         LaunchedEffect(composeSystemDark) {
             while (true) {
                 systemDark = readWindowsDarkMode() ?: composeSystemDark
-                delay(2000)
+                delay(15_000)
             }
         }
         AppRoot(dataDir, systemDark)
