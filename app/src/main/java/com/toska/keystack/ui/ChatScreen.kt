@@ -103,6 +103,7 @@ import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.ReleaseInfo
+import com.toska.keystack.ReleaseChecker
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
 import com.toska.keystack.ui.theme.KeyStackMark
