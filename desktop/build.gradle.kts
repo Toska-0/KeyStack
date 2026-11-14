@@ -47,11 +47,12 @@ val generateWindowsIcon by tasks.registering {
         g.fill(RoundRectangle2D.Float(0f, 0f, size.toFloat(), size.toFloat(), 64f, 64f))
 
         val p = Path2D.Float()
-        p.moveTo(75.0, 74.0)
-        p.lineTo(181.0, 74.0)
-        p.lineTo(131.0, 128.0)
-        p.lineTo(181.0, 182.0)
-        p.lineTo(75.0, 182.0)
+        // Larger mark: fills more of the tile while keeping a clean inset.
+        p.moveTo(59.0, 58.0)
+        p.lineTo(197.0, 58.0)
+        p.lineTo(133.0, 128.0)
+        p.lineTo(197.0, 198.0)
+        p.lineTo(59.0, 198.0)
         p.closePath()
         val colors = arrayOf(
             Color(0xFF, 0xD3, 0x4E),
