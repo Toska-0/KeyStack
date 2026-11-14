@@ -49,7 +49,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -130,8 +129,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
-    var messageSearch by remember { mutableStateOf("") }
-    var showMessageSearch by remember { mutableStateOf(false) }
     var editMessageTarget by remember { mutableStateOf<Int?>(null) }
     var editMessageText by remember { mutableStateOf("") }
     var chatSearch by remember { mutableStateOf("") }
@@ -212,11 +209,20 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         }
     }
 
+    // Follow streamed output only while the user is actually at the bottom.
+    // Checking the last item's bottom edge also works when one message is taller than the viewport.
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            val wasFollowingBottom = lastVisible >= messages.lastIndex - 1 || listState.layoutInfo.totalItemsCount == 0
-            if (wasFollowingBottom) listState.animateScrollToItem(messages.lastIndex)
+            val layout = listState.layoutInfo
+            val lastItem = layout.visibleItemsInfo.lastOrNull { it.index == messages.lastIndex }
+            val distanceToBottom = lastItem?.let {
+                it.offset + it.size - layout.viewportEndOffset
+            }
+            val isAtBottom = layout.totalItemsCount == 0 ||
+                (distanceToBottom != null && distanceToBottom <= 48)
+            if (isAtBottom) {
+                listState.scrollToItem(messages.lastIndex, Int.MAX_VALUE)
+            }
         }
     }
 
@@ -344,11 +350,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         }
                     },
                     actions = {
-                        if (messages.isNotEmpty()) {
-                            IconButton(onClick = { showMessageSearch = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "Поиск в чате")
-                            }
-                        }
                         IconButton(onClick = { vm.clearChat() }) {
                             Icon(Icons.Default.Delete, contentDescription = "Очистить чат")
                         }
@@ -537,42 +538,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 }
             }
         }
-    }
-
-    if (showMessageSearch) {
-        AlertDialog(
-            onDismissRequest = { showMessageSearch = false },
-            title = { Text("Поиск в чате") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = messageSearch,
-                        onValueChange = { messageSearch = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text("Введите запрос") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (messageSearch.isNotBlank()) {
-                                IconButton(onClick = { messageSearch = "" }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Очистить")
-                                }
-                            }
-                        }
-                    )
-                    if (messageSearch.isNotBlank()) {
-                        Text(
-                            "Найдено сообщений: ${vm.searchInConversation(messageSearch).size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showMessageSearch = false }) { Text("Готово") }
-            }
-        )
     }
 
     editMessageTarget?.let { index ->
