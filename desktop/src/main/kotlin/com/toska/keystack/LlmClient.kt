@@ -217,27 +217,31 @@ class LlmClient {
     }.flowOn(Dispatchers.IO)
 
     private fun parseChunk(api: ApiKind, data: String): String {
-        if (data.isBlank()) return ""
+        if (data.isBlank() || data == "[DONE]") return ""
         return try {
             val obj = json.parseToJsonElement(data).jsonObject
             when (api) {
-                ApiKind.OPENAI -> obj["choices"]?.jsonArray?.firstOrNull()
-                    ?.jsonObject?.get("delta")?.jsonObject?.get("content")
-                    ?.jsonPrimitive?.contentOrNull ?: ""
-
+                ApiKind.OPENAI -> {
+                    val content = obj["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                        ?.get("delta")?.jsonObject?.get("content")
+                    when (content) {
+                        null -> ""
+                        is kotlinx.serialization.json.JsonPrimitive -> content.contentOrNull ?: ""
+                        is kotlinx.serialization.json.JsonArray -> content.mapNotNull { part ->
+                            runCatching { part.jsonObject["text"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+                        }.joinToString("")
+                        else -> ""
+                    }
+                }
                 ApiKind.ANTHROPIC -> if (obj["type"]?.jsonPrimitive?.contentOrNull == "content_block_delta")
-                    obj["delta"]?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: ""
-                else ""
-
+                    obj["delta"]?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: "" else ""
                 ApiKind.GEMINI -> obj["candidates"]?.jsonArray?.firstOrNull()
                     ?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray
-                    ?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: ""
+                    ?.mapNotNull { part -> runCatching { part.jsonObject["text"]?.jsonPrimitive?.contentOrNull }.getOrNull() }
+                    ?.joinToString("") ?: ""
             }
-        } catch (e: Exception) {
-            ""
-        }
+        } catch (_: Exception) { "" }
     }
-
     private fun jsonBody(body: String) = body.toRequestBody("application/json".toMediaType())
 
     /** "data:image/jpeg;base64,XXX" -> ("image/jpeg", "XXX") */
