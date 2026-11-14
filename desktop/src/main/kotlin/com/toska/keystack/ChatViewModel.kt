@@ -98,7 +98,10 @@ class ChatViewModel {
 
     private fun persist() {
         if (!::chatStore.isInitialized) return
-        scope.launch { chatStore.save(_sessions.value) }
+        scope.launch {
+            runCatching { chatStore.save(_sessions.value) }
+                .onFailure { _error.value = "Не удалось сохранить историю: ${it.message ?: "ошибка записи"}" }
+        }
     }
 
     private fun persistCurrentMessages() {
@@ -130,6 +133,7 @@ class ChatViewModel {
         val s = _settings.value
         openSession(s.providerId, s.model)
         _messages.value = emptyList()
+        _recoverablePrompt.value = null
         _error.value = null
         persist()
     }
@@ -215,6 +219,7 @@ class ChatViewModel {
         _tokenEstimate.value = history.sumOf { estimateTokens(it.content) }
         _busy.value = true
         _error.value = null
+        _recoverablePrompt.value = null
         val requestUser = history.lastOrNull { it.role == "user" }
         if (requestUser != null) {
             _sessions.value = _sessions.value.map { if (it.id == _currentId.value) it.copy(pendingPrompt = requestUser.content, pendingImages = requestUser.images, pendingFiles = requestUser.files) else it }
