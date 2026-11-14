@@ -936,8 +936,7 @@ fun MessageBubble(
         if (!isUser && (msg.isStreaming || msg.content.isNotBlank())) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 2.dp),
-                horizontalArrangement = Arrangement.End,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (msg.isStreaming && msg.tokenEstimate > 0) Text("≈ ${msg.tokenEstimate} токенов · генерируется", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
