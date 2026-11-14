@@ -31,6 +31,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.apache.pdfbox:pdfbox:3.0.4")
+    testImplementation(kotlin("test-junit5"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("net.java.dev.jna:jna:5.14.0")
 }
 
@@ -114,3 +117,6 @@ tasks.matching {
 }.configureEach {
     dependsOn(generateWindowsIcon)
 }
+
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach { useJUnitPlatform() }
