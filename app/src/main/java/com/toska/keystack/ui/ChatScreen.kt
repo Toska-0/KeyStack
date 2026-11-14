@@ -105,6 +105,7 @@ import com.toska.keystack.LlmClient
 import com.toska.keystack.Providers
 import com.toska.keystack.UiMessage
 import com.toska.keystack.ui.theme.MistralGradient
+import com.toska.keystack.ui.theme.KeyStackMark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -237,7 +238,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                                 .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(7.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("K", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                            KeyStackMark(Modifier.size(20.dp))
                         }
                         Spacer(Modifier.width(10.dp))
                         Column {
@@ -535,7 +536,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(
-                                    if (canSend) Brush.linearGradient(MistralGradient)
+                                    if (canSend) SolidColor(MaterialTheme.colorScheme.primary)
                                     else SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
                                     CircleShape
                                 )
@@ -736,7 +737,7 @@ private fun VibeWelcomePanel(
                 .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(15.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Text("K", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+            KeyStackMark(Modifier.size(32.dp))
         }
         Spacer(Modifier.height(16.dp))
         Text(
