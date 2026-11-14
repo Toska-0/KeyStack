@@ -20,8 +20,9 @@ object WebSearch {
         .callTimeout(22, TimeUnit.SECONDS)
         .build()
 
+    // Only explicit search intent triggers a network request; ordinary explanations stay local.
     private val intentPattern = Regex(
-        "(?iu)(найди|найти|поищи|поищите|поиск|интернет|в сети|источники|ссылки|новости|сегодня|сейчас|актуальн\\w*|последн\\w*|на данный момент|курс валют|погода|цена\\s+(сейчас|сегодня)?|что такое|кто такой|кто такая|расскажи|объясни|информация о|сведения о|подробности о|что известно о|обзор|сравни|когда вышел|сколько стоит|где находится|what is|who is|search for|look up|latest|current|today|news|price|weather|in 202[5-9])"
+        "(?iu)(\\bнайди\\b|\\bнайти\\b|\\bпоищи\\b|\\bпоиск\\b|\\bв интернете\\b|\\bв сети\\b|\\bисточники\\b|\\bссылки\\b|\\bновости\\b|\\bсегодня\\b|\\bсейчас\\b|\\bактуальн\\w*\\b|\\bпоследн\\w*\\b|\\bна данный момент\\b|\\bкурс валют\\b|\\bпогода\\b|\\bцена сейчас\\b|\\bсколько стоит сейчас\\b|\\bгде находится\\b|\\bsearch for\\b|\\blook up\\b|\\blatest\\b|\\bcurrent\\b|\\btoday\\b|\\bnews\\b|\\bweather\\b)"
     )
 
     fun shouldSearch(query: String): Boolean =
