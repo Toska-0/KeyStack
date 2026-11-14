@@ -9,6 +9,10 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.AtomicMoveNotSupportedException
 
 @Serializable
 data class AttachedFile(
@@ -52,21 +56,38 @@ class ChatStore(baseDir: File) {
     private val mutex = Mutex()
 
     suspend fun load(): List<ChatSession> = withContext(Dispatchers.IO) {
-        try {
-            if (file.exists()) json.decodeFromString<List<ChatSession>>(file.readText()) else emptyList()
-        } catch (e: Exception) {
-            emptyList()
+        if (!file.exists()) return@withContext emptyList()
+        val backup = File(file.parentFile, "chats.json.bak")
+        fun decode(source: File): List<ChatSession> = json.decodeFromString<List<ChatSession>>(source.readText(Charsets.UTF_8))
+        try { decode(file) } catch (primary: Exception) {
+            if (backup.exists()) {
+                try {
+                    val recovered = decode(backup)
+                    runCatching { Files.copy(file.toPath(), File(file.parentFile, "chats.json.corrupt").toPath(), StandardCopyOption.REPLACE_EXISTING) }
+                    runCatching { Files.copy(backup.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+                    recovered
+                } catch (backupError: Exception) {
+                    throw IOException("Не удалось прочитать историю чатов. Файл и резервная копия повреждены.", backupError)
+                }
+            } else {
+                runCatching { Files.copy(file.toPath(), File(file.parentFile, "chats.json.corrupt").toPath(), StandardCopyOption.REPLACE_EXISTING) }
+                throw IOException("Файл истории повреждён. Копия сохранена как chats.json.corrupt.", primary)
+            }
         }
     }
 
     suspend fun save(sessions: List<ChatSession>) = mutex.withLock {
         withContext(Dispatchers.IO) {
+            file.parentFile?.mkdirs()
+            val temp = File(file.parentFile, "chats.json.tmp")
+            val backup = File(file.parentFile, "chats.json.bak")
+            temp.writeText(json.encodeToString(sessions), Charsets.UTF_8)
+            if (file.exists()) Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
             try {
-                file.parentFile?.mkdirs()
-                file.writeText(json.encodeToString(sessions))
-            } catch (e: Exception) {
-                // ignore write errors
-            }
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally { if (temp.exists()) temp.delete() }
         }
     }
 }
