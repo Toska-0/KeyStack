@@ -348,9 +348,11 @@ class ChatViewModel {
         val session = _sessions.value.firstOrNull { it.id == _currentId.value } ?: return
         val prompt = _recoverablePrompt.value ?: return
         _recoverablePrompt.value = null
+        val retryHistory = _messages.value.let { current -> if (current.lastOrNull()?.role == "assistant") current.dropLast(1) else current }
         _sessions.value = _sessions.value.map { if (it.id == session.id) it.copy(pendingPrompt = null, pendingImages = emptyList(), pendingFiles = emptyList()) else it }
         persist()
-        send(prompt, session.pendingImages, session.pendingFiles)
+        // Retry the existing user turn; do not append a duplicate user message.
+        startStream(retryHistory)
     }
 
     private fun estimateTokens(text: String): Int = if (text.isBlank()) 0 else ((text.length + 3) / 4).coerceAtLeast(1)
