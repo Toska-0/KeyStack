@@ -222,12 +222,12 @@ class ChatViewModel {
             val apiMessages = buildList {
                 if (workspacePrompt.isNotBlank()) add(ChatMessage("system", workspacePrompt))
                 if (webContext.isNotBlank()) add(ChatMessage("system", webContext))
-                addAll(history.map { message ->
+                addAll(history.takeLast(40).map { message ->
                     val fileContext = message.files.joinToString("\n\n") { file ->
                         if (file.content.isBlank()) "Attached file: ${file.name} (content preview unavailable)"
-                        else "Attached file: ${file.name}\n```text\n${file.content.take(100_000)}\n```"
+                        else "Attached file: ${file.name}\n```text\n${file.content.take(30_000)}\n```"
                     }
-                    ChatMessage(message.role, if (fileContext.isBlank()) message.content else listOf(message.content, fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
+                    ChatMessage(message.role, if (fileContext.isBlank()) message.content.takeLast(80_000) else listOf(message.content.takeLast(80_000), fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
                 })
             }
             val sb = StringBuilder()
