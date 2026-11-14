@@ -1,6 +1,8 @@
 package com.toska.keystack
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +18,7 @@ import com.toska.keystack.ui.ChatScreen
 import com.toska.keystack.ui.SetupScreen
 import com.toska.keystack.ui.theme.KeyStackTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,8 +29,20 @@ class MainActivity : ComponentActivity() {
             val chatStore = remember { ChatStore(applicationContext) }
             val vm: ChatViewModel = viewModel()
             val scope = rememberCoroutineScope()
+            val updatePrefs = remember { getSharedPreferences("release_updates", MODE_PRIVATE) }
+            var releaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
 
             LaunchedEffect(Unit) { vm.init(settingsStore, chatStore) }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    val latest = ReleaseChecker.checkForUpdate()
+                    if (latest != null && updatePrefs.getString("dismissed_release_tag", null) != latest.tagName) {
+                        releaseInfo = latest
+                    }
+                    delay(6 * 60 * 60 * 1000L)
+                }
+            }
 
             val settings by settingsStore.settings.collectAsState(initial = Settings("", "", "", ""))
             var showSetup by remember { mutableStateOf(true) }
@@ -67,7 +82,15 @@ class MainActivity : ComponentActivity() {
                 } else {
                     ChatScreen(
                         vm = vm,
-                        onOpenSettings = { showSetup = true }
+                        onOpenSettings = { showSetup = true },
+                        releaseInfo = releaseInfo,
+                        onDismissRelease = {
+                            releaseInfo?.let { updatePrefs.edit().putString("dismissed_release_tag", it.tagName).apply() }
+                            releaseInfo = null
+                        },
+                        onOpenRelease = { url ->
+                            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                        }
                     )
                 }
             }
