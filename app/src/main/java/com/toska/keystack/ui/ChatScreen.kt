@@ -238,14 +238,14 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .background(Color.White, RoundedCornerShape(9.dp)),
+                                .size(38.dp)
+                                .background(Color.White, RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.drawable.ic_launcher_foreground),
                                 contentDescription = "KeyStack",
-                                modifier = Modifier.size(34.dp)
+                                modifier = Modifier.size(38.dp)
                             )
                         }
                         Spacer(Modifier.width(10.dp))
@@ -736,6 +736,18 @@ private fun VibeWelcomePanel(
     providerName: String,
     modifier: Modifier = Modifier
 ) {
+    val greetings = remember {
+        listOf(
+            "Привет! Чем займёмся сегодня?" to "Расскажи, что у тебя на уме — начнём с этого.",
+            "С чего начнём?" to "Можем разобраться с вопросом, идеей или задачей.",
+            "Рад тебя видеть!" to "Опиши задачу своими словами — я помогу её решить.",
+            "Есть интересная идея?" to "Давай превратим её в понятный план действий.",
+            "Что будем создавать?" to "Можно начать новый проект или продолжить старый.",
+            "Готов помочь." to "Задай вопрос или прикрепи файл для разбора.",
+            "Давай приступим." to "Напиши, что нужно сделать, и разберёмся вместе.",
+            "На связи!" to "От небольшого вопроса до большой задачи — начинай."
+        ).random()
+    }
     Column(
         modifier = modifier.padding(horizontal = 22.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.Center,
@@ -743,22 +755,26 @@ private fun VibeWelcomePanel(
     ) {
         Box(
             modifier = Modifier
-                .size(52.dp)
-                .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(15.dp)),
+                .size(72.dp)
+                .background(Color.White, RoundedCornerShape(20.dp)),
             contentAlignment = Alignment.Center
         ) {
-            KeyStackMark(Modifier.size(32.dp))
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.drawable.ic_launcher_foreground),
+                contentDescription = "KeyStack",
+                modifier = Modifier.size(72.dp)
+            )
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            "Добро пожаловать. С чего начнём?",
+            greetings.first,
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Задайте вопрос, начните проект или прикрепите файл.",
+            greetings.second,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
