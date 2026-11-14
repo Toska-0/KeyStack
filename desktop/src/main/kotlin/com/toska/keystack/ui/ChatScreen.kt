@@ -803,6 +803,7 @@ vm.send(input, pendingImages, pendingFiles.map { AttachedFile(it.name, it.text) 
                         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(proposal.relativePath, style = MaterialTheme.typography.titleSmall)
                             Text("Размер нового содержимого: ${proposal.content.length} символов", style = MaterialTheme.typography.bodySmall)
+                            Text(proposal.content.take(1200), maxLines = 10, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = { vm.approveWorkspaceWrite(index) }) { Text("Сохранить") }
                                 TextButton(onClick = { vm.rejectWorkspaceWrites() }) { Text("Отклонить все") }
