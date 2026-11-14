@@ -207,7 +207,7 @@ fun SetupScreen(
                             }
                             if (p.keyUrl.isNotBlank()) {
                                 Text(
-                                    "Получить API-ключ",
+                                    if (p.id == "kiro") "Инструкция по подключению" else "Получить API-ключ",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.clickable { uriHandler.openUri(p.keyUrl) }
@@ -226,6 +226,13 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (provider.id == "kiro") {
+                    Text(
+                        "Kiro подключается через OpenAI-совместимый Kiro API gateway. Запусти шлюз отдельно, укажи его адрес и API-ключ. Пример адреса: http://127.0.0.1:8080/v1. На Android вместо 127.0.0.1 укажи IP компьютера или сервера в сети.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             OutlinedTextField(
