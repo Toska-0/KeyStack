@@ -1065,11 +1065,6 @@ fun MessageBubble(
                     Spacer(Modifier.width(4.dp))
                     Text("Изменить", style = MaterialTheme.typography.labelMedium)
                 }
-                TextButton(onClick = onBranch, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Text("↳", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Ветка", style = MaterialTheme.typography.labelMedium)
-                }
             }
         }
         if (!isUser && (msg.isStreaming || msg.content.isNotBlank())) {
@@ -1105,6 +1100,11 @@ fun MessageBubble(
                         if (copied) "Скопировано" else "Копировать",
                         style = MaterialTheme.typography.labelMedium
                     )
+                }
+                TextButton(onClick = onBranch, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text("↳", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Создать ветвь", style = MaterialTheme.typography.labelMedium)
                 }
                 if (isLastAssistant && !busy) {
                     TextButton(
