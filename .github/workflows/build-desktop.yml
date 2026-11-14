@@ -26,6 +26,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Run desktop regression tests
+        run: gradle :desktop:test --no-daemon
+
       - name: Build portable distributable
         run: gradle :desktop:createDistributable --no-daemon
 
