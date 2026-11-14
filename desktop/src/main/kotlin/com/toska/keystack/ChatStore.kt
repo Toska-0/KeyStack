@@ -64,7 +64,7 @@ class ChatStore(baseDir: File) {
         if (!uri.startsWith("data:") || marker !in uri) return uri
         val mime = uri.substringAfter("data:").substringBefore(marker)
         val payload = uri.substringAfter(marker)
-        val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xff) }
         val target = File(imagesDir, digest + ".img")
         if (!target.exists()) { imagesDir.mkdirs(); target.writeBytes(Base64.getDecoder().decode(payload)) }
         return "keystack-image:" + digest + ":" + mime
@@ -73,7 +73,7 @@ class ChatStore(baseDir: File) {
     private fun imageFromDisk(reference: String): String {
         if (!reference.startsWith("keystack-image:")) return reference
         val parts = reference.split(":", limit = 3)
-        if (parts.size != 3) return ""
+        if (parts.size != 3 || !parts[1].matches(Regex("[a-f0-9]{64}"))) return ""
         val imageFile = File(imagesDir, parts[1] + ".img")
         if (!imageFile.exists()) return ""
         return "data:" + parts[2] + ";base64," + Base64.getEncoder().encodeToString(imageFile.readBytes())
