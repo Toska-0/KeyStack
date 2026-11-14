@@ -45,7 +45,9 @@ data class ChatSession(
     val messages: List<StoredMessage> = emptyList(),
     val parentSessionId: String? = null,
     val branchMessageId: String? = null,
-    val pendingPrompt: String? = null
+    val pendingPrompt: String? = null,
+    val pendingImages: List<String> = emptyList(),
+    val pendingFiles: List<AttachedFile> = emptyList()
 )
 
 /** Десктоп-версия: чаты хранятся в JSON-файле в каталоге данных приложения. */
