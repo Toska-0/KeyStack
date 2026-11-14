@@ -245,7 +245,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.drawable.ic_launcher_foreground),
                                 contentDescription = "KeyStack",
-                                modifier = Modifier.size(38.dp)
+                                modifier = Modifier.size(38.dp).graphicsLayer { scaleX = 1.65f; scaleY = 1.65f }
                             )
                         }
                         Spacer(Modifier.width(10.dp))
@@ -762,7 +762,7 @@ private fun VibeWelcomePanel(
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.drawable.ic_launcher_foreground),
                 contentDescription = "KeyStack",
-                modifier = Modifier.size(72.dp)
+                modifier = Modifier.size(72.dp).graphicsLayer { scaleX = 1.65f; scaleY = 1.65f }
             )
         }
         Spacer(Modifier.height(16.dp))
