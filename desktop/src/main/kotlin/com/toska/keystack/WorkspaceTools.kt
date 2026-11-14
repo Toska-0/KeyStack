@@ -3,6 +3,7 @@ package com.toska.keystack
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 
 private const val MAX_WORKSPACE_FILE_BYTES = 256 * 1024
 private const val MAX_WORKSPACE_CONTEXT_CHARS = 60_000
@@ -28,8 +29,8 @@ internal fun buildWorkspacePrompt(workspacePath: String): String {
                     if (Files.size(file) <= MAX_WORKSPACE_FILE_BYTES) {
                         val text = Files.readString(file)
                         val relative = root.relativize(file).toString().replace(File.separatorChar, '/')
-                        snapshot.append("\\n--- Файл: ").append(relative).append(" ---\\n")
-                            .append(text.take(12_000)).append("\\n")
+                        snapshot.append("\n--- Файл: ").append(relative).append(" ---\n")
+                            .append(text.take(12_000)).append("\n")
                         included++
                     }
                 }
@@ -55,36 +56,44 @@ $snapshot
 """.trim()
 }
 
-internal fun applyWorkspaceWrites(workspacePath: String, response: String): Pair<String, List<String>> {
-    if (workspacePath.isBlank()) return response to emptyList()
-    val root = runCatching { Paths.get(workspacePath).toRealPath() }.getOrNull()
-        ?: return response to emptyList()
-    if (!Files.isDirectory(root)) return response to emptyList()
+internal data class ProposedWorkspaceWrite(val relativePath: String, val content: String)
 
-    val block = Regex("""(?s)```keystack-write\s+path="([^"]+)"\s*\n(.*?)\n```""")
-    val results = mutableListOf<String>()
+internal fun extractWorkspaceWrites(response: String): Pair<String, List<ProposedWorkspaceWrite>> {
+    val block = Regex("""(?s)```keystack-write\\s+path="([^"]+)"\\s*\\n(.*?)\\n```""")
+    val proposals = mutableListOf<ProposedWorkspaceWrite>()
     val visible = block.replace(response) { match ->
-        val relative = match.groupValues[1]
-        val body = match.groupValues[2]
-        val result = runCatching {
-            val rel = Paths.get(relative)
-            require(!rel.isAbsolute) { "Абсолютные пути запрещены" }
-            val target = root.resolve(rel).normalize()
-            require(target.startsWith(root) && target != root) { "Путь выходит за пределы рабочей папки" }
-            require(body.toByteArray(Charsets.UTF_8).size <= 1_000_000) { "Файл превышает 1 МБ" }
-            Files.createDirectories(target.parent)
-            val realParent = target.parent.toRealPath()
-            require(realParent.startsWith(root)) { "Символическая ссылка за пределы рабочей папки запрещена" }
-            if (Files.exists(target)) {
-                require(!Files.isSymbolicLink(target) && target.toRealPath().startsWith(root)) {
-                    "Запись через символическую ссылку запрещена"
-                }
-            }
-            Files.writeString(target, body, Charsets.UTF_8)
-            "Создан/обновлён: " + root.relativize(target).toString().replace(File.separatorChar, '/')
-        }.getOrElse { "Не удалось записать «$relative»: " + (it.message ?: "ошибка доступа") }
-        results += result
+        proposals += ProposedWorkspaceWrite(match.groupValues[1], match.groupValues[2])
         ""
     }.trim()
-    return visible to results
+    return visible to proposals
+}
+
+internal fun applyWorkspaceWrite(workspacePath: String, proposal: ProposedWorkspaceWrite): String {
+    if (workspacePath.isBlank()) return "Рабочая папка не выбрана"
+    val root = runCatching { Paths.get(workspacePath).toRealPath() }.getOrElse { return "Рабочая папка недоступна" }
+    if (!Files.isDirectory(root)) return "Рабочая папка не является каталогом"
+    val relative = proposal.relativePath
+    return runCatching {
+        val rel = Paths.get(relative)
+        require(!rel.isAbsolute) { "Абсолютные пути запрещены" }
+        require(rel.none { it.toString() == ".." }) { "Переходы через .. запрещены" }
+        val target = root.resolve(rel).normalize()
+        require(target.startsWith(root) && target != root) { "Путь выходит за пределы рабочей папки" }
+        require(proposal.content.toByteArray(Charsets.UTF_8).size <= 1_000_000) { "Файл превышает 1 МБ" }
+        Files.createDirectories(target.parent)
+        require(target.parent.toRealPath().startsWith(root)) { "Символическая ссылка за пределы рабочей папки запрещена" }
+        if (Files.exists(target)) {
+            require(!Files.isSymbolicLink(target) && target.toRealPath().startsWith(root)) { "Запись через символическую ссылку запрещена" }
+            val backupDir = root.resolve(".keystack-backups")
+            Files.createDirectories(backupDir)
+            Files.copy(target, backupDir.resolve(target.fileName.toString() + "." + System.currentTimeMillis() + ".bak"), StandardCopyOption.REPLACE_EXISTING)
+        }
+        val temp = Files.createTempFile(target.parent, ".keystack-", ".tmp")
+        try {
+            Files.writeString(temp, proposal.content, Charsets.UTF_8)
+            try { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
+            catch (_: java.nio.file.AtomicMoveNotSupportedException) { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING) }
+        } finally { Files.deleteIfExists(temp) }
+        "Сохранено: " + root.relativize(target).toString().replace(File.separatorChar, '/')
+    }.getOrElse { "Не удалось записать «$relative»: " + (it.message ?: "ошибка доступа") }
 }
