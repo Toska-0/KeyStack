@@ -46,7 +46,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -480,7 +479,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         onPickFiles = { scope.launch { loadingAttachments = true; val picked = pickDocuments(); pendingFiles = (pendingFiles + picked).distinctBy { it.path.ifBlank { it.name } }; saveRecentAttachmentPaths(picked.map { it.path }); loadingAttachments = false } },
                         onPasteImageValue = { pendingImages = (pendingImages + it).distinct().take(4) },
                         onPickRecent = { recentPickerOpen = true },
-                        enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty() || pendingFiles.isNotEmpty()
+                        enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
                         Text(
