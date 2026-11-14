@@ -68,7 +68,7 @@ class ChatViewModel {
         scope.launch(Dispatchers.IO) {
             val result = applyWorkspaceWrite(path, proposal)
             _pendingWorkspaceWrites.value = _pendingWorkspaceWrites.value.filterNot { it == proposal }
-            _error.value = result
+            _error.value = if (result.startsWith("Не удалось")) result else null
         }
     }
 
@@ -229,7 +229,7 @@ class ChatViewModel {
         job = scope.launch {
             val workspacePrompt = withContext(Dispatchers.IO) { buildWorkspacePrompt(s.workspacePath) }
             val webContext = WebSearch.searchForPrompt(history.lastOrNull()?.takeIf { it.role == "user" }?.content.orEmpty())
-            val apiMessages = buildList {
+            val apiMessages = fitContext(buildList {
                 if (workspacePrompt.isNotBlank()) add(ChatMessage("system", workspacePrompt))
                 if (webContext.isNotBlank()) add(ChatMessage("system", webContext))
                 addAll(history.takeLast(24).map { message ->
@@ -239,7 +239,7 @@ class ChatViewModel {
                     }
                     ChatMessage(message.role, if (fileContext.isBlank()) message.content.takeLast(12_000) else listOf(message.content.takeLast(12_000), fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
                 })
-            }
+            })
             val sb = StringBuilder()
             val candidates = buildList {
                 add(Triple(Providers.byId(s.providerId), s.apiKey, s.model to s.baseUrl))
@@ -363,6 +363,23 @@ class ChatViewModel {
         persist()
         // Retry the existing user turn; do not append a duplicate user message.
         startStream(retryHistory)
+    }
+
+    private fun fitContext(messages: List<ChatMessage>, maxChars: Int = 28_000): List<ChatMessage> {
+        var budget = maxChars
+        val system = messages.filter { it.role == "system" }.map { message ->
+            val text = message.content.take(8_000)
+            budget -= text.length
+            message.copy(content = text)
+        }
+        val turns = messages.filter { it.role != "system" }.asReversed().mapNotNull { message ->
+            if (budget <= 0) null else {
+                val text = message.content.takeLast(budget.coerceAtMost(6_000))
+                budget -= text.length
+                message.copy(content = text)
+            }
+        }.asReversed()
+        return system + turns
     }
 
     private fun estimateTokens(text: String): Int = if (text.isBlank()) 0 else ((text.length + 3) / 4).coerceAtLeast(1)
