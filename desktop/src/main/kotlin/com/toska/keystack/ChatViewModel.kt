@@ -232,7 +232,7 @@ class ChatViewModel {
                         if (file.content.isBlank()) "Attached file: ${file.name} (content preview unavailable)"
                         else "Attached file: ${file.name}\n```text\n${file.content.take(12_000)}\n```"
                     }
-                    ChatMessage(message.role, if (fileContext.isBlank()) message.content.takeLast(12_000) else listOf(message.content.takeLast(80_000), fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
+                    ChatMessage(message.role, if (fileContext.isBlank()) message.content.takeLast(12_000) else listOf(message.content.takeLast(12_000), fileContext).filter { it.isNotBlank() }.joinToString("\n\n"), message.images)
                 })
             }
             val sb = StringBuilder()
