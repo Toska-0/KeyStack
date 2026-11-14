@@ -46,11 +46,11 @@ val generateWindowsIcon by tasks.registering {
         g.fill(RoundRectangle2D.Float(0f, 0f, size.toFloat(), size.toFloat(), 64f, 64f))
 
         val p = Path2D.Float()
-        p.moveTo(62.0, 60.0)
-        p.lineTo(194.0, 60.0)
-        p.lineTo(132.0, 128.0)
-        p.lineTo(194.0, 196.0)
-        p.lineTo(62.0, 196.0)
+        p.moveTo(75.0, 74.0)
+        p.lineTo(181.0, 74.0)
+        p.lineTo(131.0, 128.0)
+        p.lineTo(181.0, 182.0)
+        p.lineTo(75.0, 182.0)
         p.closePath()
         val colors = arrayOf(
             Color(0xFF, 0xD3, 0x4E),
@@ -60,7 +60,7 @@ val generateWindowsIcon by tasks.registering {
             Color(0x26, 0x3C, 0x9B)
         )
         val fractions = floatArrayOf(0f, 0.28f, 0.55f, 0.78f, 1f)
-        g.paint = java.awt.LinearGradientPaint(62f, 60f, 194f, 196f, fractions, colors)
+        g.paint = java.awt.LinearGradientPaint(75f, 74f, 181f, 182f, fractions, colors)
         g.fill(p)
         g.dispose()
 
