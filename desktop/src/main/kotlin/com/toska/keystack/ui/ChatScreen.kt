@@ -148,8 +148,8 @@ suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
     withContext(Dispatchers.IO) {
         (chooser.selectedFiles.toList().ifEmpty { listOfNotNull(chooser.selectedFile) }).mapNotNull { f ->
             runCatching {
+                if (f.length() > 8_000_000L) return@mapNotNull null
                 val bytes = f.readBytes()
-                if (bytes.size > 8_000_000) return@mapNotNull null
                 val mime = when (f.extension.lowercase()) {
                     "png" -> "image/png"
                     "webp" -> "image/webp"
@@ -196,8 +196,8 @@ private suspend fun readDroppedFiles(files: List<File>): Pair<List<String>, List
     files.filter { it.isFile }.take(12).forEach { file -> runCatching {
         when (file.extension.lowercase()) {
             "png", "jpg", "jpeg", "webp", "gif", "bmp" -> {
-                val bytes = file.readBytes()
-                if (bytes.size <= 8_000_000) {
+                if (file.length() <= 8_000_000L) {
+                    val bytes = file.readBytes()
                     val mime = when (file.extension.lowercase()) { "png" -> "image/png"; "webp" -> "image/webp"; "gif" -> "image/gif"; "bmp" -> "image/bmp"; else -> "image/jpeg" }
                     images += "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes)
                 }
@@ -227,6 +227,8 @@ fun ChatScreen(
     val settings by vm.settings.collectAsState()
     val sessions by vm.sessions.collectAsState()
     val currentId by vm.currentId.collectAsState()
+    val recoverablePrompt by vm.recoverablePrompt.collectAsState()
+    val pendingWorkspaceWrites by vm.pendingWorkspaceWrites.collectAsState()
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -468,6 +470,14 @@ fun ChatScreen(
                 } else {
                     Text(if (settings.providerId == "openrouter") "Реальная квота не получена" else "Лимит не раскрывается API",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (recoverablePrompt != null) {
+                Surface(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp), color = MaterialTheme.colorScheme.tertiaryContainer, shape = RoundedCornerShape(12.dp)) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Запрос был прерван. Можно повторить его вместе с вложениями.", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { vm.recoverInterruptedRequest() }) { Text("Повторить") }
+                    }
                 }
             }
             if (messages.isEmpty()) {
@@ -764,6 +774,29 @@ vm.send(input, pendingImages, pendingFiles.map { AttachedFile(it.name, it.text) 
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) { Text("Отмена") }
             }
+        )
+    }
+
+    if (pendingWorkspaceWrites.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { vm.rejectWorkspaceWrites() },
+            title = { Text("Разрешить изменение файлов?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("ИИ подготовил изменения. Ничего не будет записано без подтверждения.")
+                    pendingWorkspaceWrites.forEachIndexed { index, proposal ->
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(proposal.relativePath, style = MaterialTheme.typography.titleSmall)
+                            Text("Размер нового содержимого: ${proposal.content.length} символов", style = MaterialTheme.typography.bodySmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { vm.approveWorkspaceWrite(index) }) { Text("Сохранить") }
+                                TextButton(onClick = { vm.rejectWorkspaceWrites() }) { Text("Отклонить все") }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { vm.rejectWorkspaceWrites() }) { Text("Закрыть") } }
         )
     }
 
