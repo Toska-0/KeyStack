@@ -134,7 +134,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     var editMessageTarget by remember { mutableStateOf<Int?>(null) }
     var editMessageText by remember { mutableStateOf("") }
     var chatSearch by remember { mutableStateOf("") }
-    var workspaceMode by remember { mutableStateOf("Работа") }
     val listState = rememberLazyListState()
 
     var renameTarget by remember { mutableStateOf<ChatSession?>(null) }
@@ -232,14 +231,11 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(Brush.linearGradient(MistralGradient), RoundedCornerShape(7.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            KeyStackMark(Modifier.size(20.dp))
-                        }
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(com.toska.keystack.R.mipmap.ic_launcher),
+                            contentDescription = "KeyStack",
+                            modifier = Modifier.size(34.dp)
+                        )
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text("KeyStack", style = MaterialTheme.typography.titleMedium)
@@ -251,24 +247,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         scope.launch { drawerState.close() }
                     }) {
                         Icon(Icons.Default.Add, contentDescription = "Новый чат")
-                    }
-                }
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(9.dp)).padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    listOf("Работа", "Код").forEach { mode ->
-                        Surface(
-                            modifier = Modifier.weight(1f).clickable { workspaceMode = mode },
-                            color = if (workspaceMode == mode) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            shape = RoundedCornerShape(7.dp)
-                        ) {
-                            Text(mode, modifier = Modifier.padding(vertical = 8.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = if (workspaceMode == mode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelLarge)
-                        }
                     }
                 }
                 Text(
