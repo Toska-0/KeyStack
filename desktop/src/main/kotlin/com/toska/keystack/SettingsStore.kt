@@ -76,14 +76,28 @@ class SettingsStore(baseDir: File) {
 
     private fun loadStored(): StoredSettings {
         if (!file.exists()) return StoredSettings()
-        return try {
-            val raw = json.decodeFromString<StoredSettings>(file.readText(Charsets.UTF_8))
-            raw.copy(keys = raw.keys.mapValues { (_, value) -> revealSecret(value) })
-        } catch (e: Exception) {
-            throw IllegalStateException("Не удалось прочитать settings.json. Файл не был изменён.", e)
+        val backup = File(file.parentFile, "settings.json.bak")
+        val raw = try {
+            json.decodeFromString<StoredSettings>(file.readText(Charsets.UTF_8))
+        } catch (primary: Exception) {
+            if (!backup.exists()) throw IllegalStateException("Не удалось прочитать settings.json. Файл не был изменён.", primary)
+            val recovered = try { json.decodeFromString<StoredSettings>(backup.readText(Charsets.UTF_8)) }
+            catch (backupError: Exception) { throw IllegalStateException("settings.json и резервная копия повреждены.", backupError) }
+            runCatching { Files.copy(file.toPath(), File(file.parentFile, "settings.json.corrupt").toPath(), StandardCopyOption.REPLACE_EXISTING) }
+            runCatching { Files.copy(backup.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+            recovered
         }
+        // Migrate old plaintext API keys immediately so the legacy file/backup does not retain secrets.
+        if (isWindows() && raw.keys.values.any { it.isNotEmpty() && !it.startsWith("dpapi:") }) {
+            val encrypted = raw.copy(keys = raw.keys.mapValues { (_, value) -> protectSecret(value) })
+            val temp = File(file.parentFile, "settings.json.migrate")
+            temp.writeText(json.encodeToString(encrypted), Charsets.UTF_8)
+            try { Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
+            catch (_: AtomicMoveNotSupportedException) { Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+            backup.delete()
+        }
+        return raw.copy(keys = raw.keys.mapValues { (_, value) -> revealSecret(value) })
     }
-
     private val _state = MutableStateFlow(loadStored())
 
     val settings: Flow<Settings> = _state.map { s ->
