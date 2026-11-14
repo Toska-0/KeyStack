@@ -62,7 +62,8 @@ object Providers {
         ),
         Provider(
             "kiro", "Kiro AI (Gateway)", "", ApiKind.OPENAI,
-            emptyList(), "https://github.com/xwteam/kiro2api", needsBaseUrl = true
+            listOf("claude-sonnet-4.6", "claude-opus-4.6", "claude-haiku-4.5", "deepseek-3.2"),
+            "https://github.com/xwteam/kiro2api", needsBaseUrl = true
         ),
         Provider(
             "custom", "Custom (OpenAI-compatible)", "", ApiKind.OPENAI,
