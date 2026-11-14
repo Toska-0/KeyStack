@@ -131,6 +131,7 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val client = remember { LlmClient() }
     var input by remember { mutableStateOf("") }
     var messageSearch by remember { mutableStateOf("") }
+    var showMessageSearch by remember { mutableStateOf(false) }
     var editMessageTarget by remember { mutableStateOf<Int?>(null) }
     var editMessageText by remember { mutableStateOf("") }
     var chatSearch by remember { mutableStateOf("") }
@@ -212,7 +213,11 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     }
 
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+        if (messages.isNotEmpty()) {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val wasFollowingBottom = lastVisible >= messages.lastIndex - 1 || listState.layoutInfo.totalItemsCount == 0
+            if (wasFollowingBottom) listState.animateScrollToItem(messages.lastIndex)
+        }
     }
 
     val currentSession = sessions.firstOrNull { it.id == currentId }
@@ -332,6 +337,11 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         }
                     },
                     actions = {
+                        if (messages.isNotEmpty()) {
+                            IconButton(onClick = { showMessageSearch = true }) {
+                                Icon(Icons.Default.Search, contentDescription = "Поиск в чате")
+                            }
+                        }
                         IconButton(onClick = { vm.clearChat() }) {
                             Icon(Icons.Default.Delete, contentDescription = "Очистить чат")
                         }
@@ -367,27 +377,6 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                         LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
                     } else if (settings.providerId == "openrouter") Text("Квота ключа недоступна", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (messages.isNotEmpty()) {
-                OutlinedTextField(
-                    value = messageSearch,
-                    onValueChange = { messageSearch = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                    singleLine = true,
-                    placeholder = { Text("Поиск в переписке") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (messageSearch.isNotBlank()) TextButton(onClick = { messageSearch = "" }) { Text("Очистить") }
-                    }
-                )
-                if (messageSearch.isNotBlank()) {
-                    Text(
-                        "Найдено сообщений: ${vm.searchInConversation(messageSearch).size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
-                    )
-                }
-            }
             if (messages.isEmpty()) {
                     VibeWelcomePanel(
                         providerName = provider.name,
@@ -541,6 +530,42 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showMessageSearch) {
+        AlertDialog(
+            onDismissRequest = { showMessageSearch = false },
+            title = { Text("Поиск в чате") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = messageSearch,
+                        onValueChange = { messageSearch = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("Введите запрос") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (messageSearch.isNotBlank()) {
+                                IconButton(onClick = { messageSearch = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Очистить")
+                                }
+                            }
+                        }
+                    )
+                    if (messageSearch.isNotBlank()) {
+                        Text(
+                            "Найдено сообщений: ${vm.searchInConversation(messageSearch).size}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMessageSearch = false }) { Text("Готово") }
+            }
+        )
     }
 
     editMessageTarget?.let { index ->
