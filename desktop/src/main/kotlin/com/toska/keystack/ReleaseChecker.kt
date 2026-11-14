@@ -4,7 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.net.HttpURLConnection
 import java.net.URL
@@ -34,10 +34,10 @@ object ReleaseChecker {
             if (connection.responseCode !in 200..299) return@withContext null
             val payload = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val json = Json.parseToJsonElement(payload).jsonObject
-            val tag = json["tag_name"]?.jsonPrimitive?.contentOrNull ?: return@withContext null
-            val url = json["html_url"]?.jsonPrimitive?.contentOrNull ?: return@withContext null
-            val title = json["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "KeyStack $tag"
-            val body = json["body"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val tag = json["tag_name"]?.let { (it as? JsonPrimitive)?.contentOrNull } ?: return@withContext null
+            val url = json["html_url"]?.let { (it as? JsonPrimitive)?.contentOrNull } ?: return@withContext null
+            val title = json["name"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.takeIf { it.isNotBlank() } ?: "KeyStack $tag"
+            val body = json["body"]?.let { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
             if (!isNewer(tag, CURRENT_VERSION)) return@withContext null
             ReleaseInfo(tag, title, body.take(1800), url)
         } catch (_: Exception) {
