@@ -98,10 +98,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.toska.keystack.AttachedFile
 import com.toska.keystack.ChatSession
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.LlmClient
@@ -162,19 +164,19 @@ suspend fun pickImages(): List<String> = withContext(Dispatchers.Swing) {
 
 /** Выбор документов и исходных файлов, содержимое которых можно передать модели как текст. */
 suspend fun pickDocuments(): List<PendingFile> = withContext(Dispatchers.Swing) {
-    val extensions = arrayOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
     val chooser = JFileChooser().apply {
-        dialogTitle = "Прикрепить документ или файл с текстом"
+        dialogTitle = "Прикрепить файл"
         setMultiSelectionEnabled(true)
-        fileFilter = FileNameExtensionFilter("Документы и исходный код", *extensions)
-        isAcceptAllFileFilterUsed = false
+        isAcceptAllFileFilterUsed = true
     }
     if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return@withContext emptyList()
     withContext(Dispatchers.IO) {
         (chooser.selectedFiles.toList().ifEmpty { listOfNotNull(chooser.selectedFile) }).mapNotNull { file ->
             runCatching {
-                require(file.isFile && file.length() <= 2_000_000L)
-                PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000), file.absolutePath)
+                require(file.isFile && file.length() <= 20_000_000L)
+                val textExtensions = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
+                val content = if (file.extension.lowercase() in textExtensions && file.length() <= 2_000_000L) file.readText(Charsets.UTF_8).take(200_000) else ""
+                PendingFile(file.name, content, file.absolutePath)
             }.getOrNull()
         }
     }
@@ -200,7 +202,11 @@ private suspend fun readDroppedFiles(files: List<File>): Pair<List<String>, List
                     images += "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes)
                 }
             }
-            else -> if (file.extension.lowercase() in setOf("txt", "md", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env") && file.length() <= 2_000_000L) docs += PendingFile(file.name, file.readText(Charsets.UTF_8).take(200_000), file.absolutePath)
+            else -> {
+                val textExtensions = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "c", "cpp", "h", "cs", "go", "rs", "php", "sql", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "sh", "bat", "ps1", "properties", "gradle", "env")
+                val content = if (file.extension.lowercase() in textExtensions && file.length() <= 2_000_000L) file.readText(Charsets.UTF_8).take(200_000) else ""
+                if (file.length() <= 20_000_000L) docs += PendingFile(file.name, content, file.absolutePath)
+            }
         }
     } }
     images to docs
@@ -242,7 +248,7 @@ fun ChatScreen(
     var loadingAttachments by remember { mutableStateOf(false) }
     var recentPickerOpen by remember { mutableStateOf(false) }
     var recentAttachmentPaths by remember { mutableStateOf(emptyList<String>()) }
-    val awtWindow = remember { java.awt.Window.getWindows().firstOrNull { it.isDisplayable } }
+    val awtWindow = remember { java.awt.Window.getWindows().filter { it.isShowing }.maxByOrNull { if (it.isActive) 1 else 0 } }
     fun saveRecentAttachmentPaths(paths: List<String>) {
         recentAttachmentPaths = (paths + recentAttachmentPaths).filter { it.isNotBlank() }.distinct().take(12)
         runCatching { val history = File(System.getProperty("user.home"), ".keystack/attachment-history.txt"); history.parentFile?.mkdirs(); history.writeText(recentAttachmentPaths.joinToString("\n")) }
@@ -255,10 +261,17 @@ fun ChatScreen(
         if (awtWindow == null) {
             onDispose { }
         } else {
-            val previousTarget = awtWindow.dropTarget
-            awtWindow.dropTarget = DropTarget(awtWindow, DnDConstants.ACTION_COPY, object : DropTargetAdapter() {
+            val handler = object : DropTargetAdapter() {
+                override fun dragEnter(event: java.awt.dnd.DropTargetDragEvent) {
+                    if (event.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) event.acceptDrag(DnDConstants.ACTION_COPY)
+                    else event.rejectDrag()
+                }
                 override fun drop(event: DropTargetDropEvent) {
                     try {
+                        if (!event.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                            event.rejectDrop()
+                            return
+                        }
                         event.acceptDrop(DnDConstants.ACTION_COPY)
                         @Suppress("UNCHECKED_CAST")
                         val files = event.transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<File>
@@ -273,8 +286,17 @@ fun ChatScreen(
                         event.dropComplete(true)
                     } catch (_: Exception) { event.dropComplete(false) }
                 }
-            }, true)
-            onDispose { awtWindow.dropTarget = previousTarget }
+            }
+            val targets = mutableMapOf<java.awt.Component, DropTarget?>()
+            fun install(component: java.awt.Component) {
+                targets[component] = component.dropTarget
+                runCatching { component.dropTarget = DropTarget(component, DnDConstants.ACTION_COPY, handler, true) }
+                if (component is java.awt.Container) component.components.forEach(::install)
+            }
+            install(awtWindow)
+            onDispose {
+                targets.forEach { (component, previous) -> runCatching { component.dropTarget = previous } }
+            }
         }
     }
 
@@ -476,9 +498,7 @@ fun ChatScreen(
                         busy = busy,
                         onStop = { vm.stop() },
                         onSend = {
-                            val fileBlock = pendingFiles.joinToString("\n\n") { f -> "Файл: ${f.name}\n```\n${f.text}\n```" }
-                            val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
-                            vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
+vm.send(input, pendingImages, pendingFiles.map { AttachedFile(it.name, it.text) }); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
                         },
                         onAttach = { attachMenu = true },
                         attachMenu = attachMenu,
@@ -490,18 +510,18 @@ fun ChatScreen(
                         enabled = input.isNotBlank() || pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()
                     )
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
-                        Text(
-                            buildString {
-                                append("Прикреплено: ")
-                                if (pendingImages.isNotEmpty()) append("изображений — ${pendingImages.size}")
-                                if (pendingImages.isNotEmpty() && pendingFiles.isNotEmpty()) append(" · ")
-                                if (pendingFiles.isNotEmpty()) append(pendingFiles.joinToString { it.name })
-                            },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            pendingImages.forEachIndexed { index, _ ->
+                                AssistChip(onClick = { pendingImages = pendingImages.filterIndexed { i, _ -> i != index } },
+                                    label = { Text("Фото ${index + 1}") },
+                                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp)) })
+                            }
+                            pendingFiles.forEach { file ->
+                                AssistChip(onClick = { pendingFiles = pendingFiles.filterNot { it.path == file.path && it.name == file.name } },
+                                    label = { Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp)) })
+                            }
+                        }
                     }
 
                 }
@@ -532,19 +552,18 @@ fun ChatScreen(
                             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
                     }
                     if (pendingImages.isNotEmpty() || pendingFiles.isNotEmpty()) {
-                        Text(
-                            buildString {
-                                append("Прикреплено: ")
-                                if (pendingImages.isNotEmpty()) append("изображений — ${pendingImages.size}")
-                                if (pendingImages.isNotEmpty() && pendingFiles.isNotEmpty()) append(" · ")
-                                if (pendingFiles.isNotEmpty()) append(pendingFiles.joinToString { it.name })
-                            },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 4.dp)
-                        )
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            pendingImages.forEachIndexed { index, _ ->
+                                AssistChip(onClick = { pendingImages = pendingImages.filterIndexed { i, _ -> i != index } },
+                                    label = { Text("Фото ${index + 1}") },
+                                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp)) })
+                            }
+                            pendingFiles.forEach { file ->
+                                AssistChip(onClick = { pendingFiles = pendingFiles.filterNot { it.path == file.path && it.name == file.name } },
+                                    label = { Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Убрать", modifier = Modifier.size(14.dp)) })
+                            }
+                        }
                     }
                     Box(
                         Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp),
@@ -553,9 +572,7 @@ fun ChatScreen(
                         ComposerBar(
                             input = input, onInput = { input = it }, busy = busy, onStop = { vm.stop() },
                             onSend = {
-                                val fileBlock = pendingFiles.joinToString("\n\n") { f -> "Файл: ${f.name}\n```\n${f.text}\n```" }
-                                val fullText = if (fileBlock.isBlank()) input else (input + "\n\n" + fileBlock).trim()
-                                vm.send(fullText, pendingImages); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
+vm.send(input, pendingImages, pendingFiles.map { AttachedFile(it.name, it.text) }); input = ""; pendingImages = emptyList(); pendingFiles = emptyList()
                             },
                             onAttach = { attachMenu = true }, attachMenu = attachMenu, onDismissAttach = { attachMenu = false },
                             onPickImages = { scope.launch { pendingImages = (pendingImages + pickImages()).distinct().take(4) } },
@@ -1070,19 +1087,25 @@ fun MessageBubble(
             } else {
                 Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp).widthIn(max = maxWidth.dp)) {
                     if (isUser && msg.images.isNotEmpty()) {
-                        Text(
-                            "📷 Фото: ${msg.images.size}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Text("📷 Фото: ${msg.images.size}", style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(4.dp))
                     }
-                    SelectionContainer {
-                        Text(
-                            msg.content + if (msg.isStreaming) " ▌" else "",
-                            color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (15f * fontScale).sp, lineHeight = (23f * fontScale).sp)
-                        )
+                    if (isUser && msg.files.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            msg.files.forEach { file ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(7.dp))
+                                    Text(file.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (file.content.isBlank()) "Файл" else "Текст · ${file.content.length} симв.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
                     }
+                    MessageRichContent(msg.content, msg.isStreaming,
+                        if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface, fontScale)
                 }
             }
         }
@@ -1149,6 +1172,49 @@ fun MessageBubble(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MessageRichContent(content: String, streaming: Boolean, color: Color, fontScale: Float) {
+    val clipboard = LocalClipboardManager.current
+    val codePattern = Regex("(?s)```([\\w.+#-]*)\\s*\\n(.*?)(?:```|$)")
+    val blocks = codePattern.findAll(content).toList()
+    if (blocks.isEmpty()) {
+        SelectionContainer { Text(content + if (streaming) " ▌" else "", color = color,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = (15f * fontScale).sp, lineHeight = (23f * fontScale).sp)) }
+        return
+    }
+    var cursor = 0
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        blocks.forEach { block ->
+            val before = content.substring(cursor, block.range.first)
+            if (before.isNotEmpty()) SelectionContainer {
+                Text(before, color = color, style = MaterialTheme.typography.bodyLarge.copy(fontSize = (15f * fontScale).sp, lineHeight = (23f * fontScale).sp))
+            }
+            val language = block.groupValues[1].ifBlank { "Код" }
+            val code = block.groupValues[2].trimEnd()
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))) {
+                Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(language.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Скопировать код") }
+                    }
+                    SelectionContainer {
+                        Text(code + if (streaming && block.range.last == content.lastIndex) " ▌" else "",
+                            color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = (13f * fontScale).sp, lineHeight = (19f * fontScale).sp))
+                    }
+                }
+            }
+            cursor = block.range.last + 1
+        }
+        if (cursor < content.length) SelectionContainer {
+            Text(content.substring(cursor) + if (streaming) " ▌" else "", color = color,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = (15f * fontScale).sp, lineHeight = (23f * fontScale).sp))
         }
     }
 }
