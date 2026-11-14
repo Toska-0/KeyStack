@@ -253,7 +253,7 @@ fun SetupScreen(
             )
 
             if (options.isNotEmpty()) {
-                // Выбор модели только из списка — вручную вписать нельзя
+                // Список — быстрый выбор; поле ниже также позволяет указать любой model ID.
                 Card(
                     onClick = {
                         search = ""
@@ -277,16 +277,15 @@ fun SetupScreen(
                         Icon(Icons.Default.ArrowDropDown, contentDescription = "Выбрать модель")
                     }
                 }
-            } else {
-                // Кастомный провайдер: список моделей получить неоткуда — manual input
-                OutlinedTextField(
-                    value = model,
-                    onValueChange = { model = it },
-                    label = { Text("ID модели") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
+
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                label = { Text("ID модели (можно ввести вручную)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             when {
                 loadingModels -> Row(
