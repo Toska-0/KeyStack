@@ -191,8 +191,12 @@ class ChatViewModel : ViewModel() {
         _busy.value = true
         _error.value = null
 
-        val apiMessages = history.map { ChatMessage(it.role, it.content, it.images) }
         job = viewModelScope.launch {
+            val webContext = WebSearch.searchForPrompt(history.lastOrNull()?.takeIf { it.role == "user" }?.content.orEmpty())
+            val apiMessages = buildList {
+                if (webContext.isNotBlank()) add(ChatMessage("system", webContext))
+                addAll(history.map { ChatMessage(it.role, it.content, it.images) })
+            }
             val sb = StringBuilder()
             val candidates = listOf(Triple(Providers.byId(s.providerId), s.apiKey, s.model to s.baseUrl))
             var succeeded = false
@@ -270,6 +274,8 @@ class ChatViewModel : ViewModel() {
 
     fun branchFrom(messageIndex: Int) {
         if (_busy.value || messageIndex !in _messages.value.indices) return
+        val selected = _messages.value[messageIndex]
+        if (selected.role != "assistant" || selected.isStreaming || selected.content.isBlank()) return
         val source = _sessions.value.firstOrNull { it.id == _currentId.value } ?: return
         val prefix = _messages.value.take(messageIndex + 1)
         val now = System.currentTimeMillis()
