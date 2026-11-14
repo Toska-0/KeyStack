@@ -18,12 +18,16 @@ import com.toska.keystack.ChatStore
 import com.toska.keystack.ChatViewModel
 import com.toska.keystack.Settings
 import com.toska.keystack.SettingsStore
+import com.toska.keystack.ReleaseInfo
+import com.toska.keystack.ReleaseChecker
 import com.toska.keystack.ui.ChatScreen
 import com.toska.keystack.ui.SetupScreen
 import com.toska.keystack.ui.theme.KeyStackTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import java.io.File
+import java.awt.Desktop
+import java.net.URI
 import java.awt.Frame
 import java.awt.Window as AwtWindow
 import com.sun.jna.Memory
@@ -62,6 +66,18 @@ fun AppRoot(dataDir: File, systemDark: Boolean) {
 
     val settings by settingsStore.settings.collectAsState(initial = Settings("", "", "", ""))
     var showSetup by remember { mutableStateOf(true) }
+    var releaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
+    val dismissedReleaseFile = remember(dataDir) { File(dataDir, "dismissed-release-tag.txt") }
+
+    LaunchedEffect(dataDir) {
+        while (true) {
+            val latest = ReleaseChecker.checkForUpdate()
+            if (latest != null && runCatching { dismissedReleaseFile.readText().trim() }.getOrNull() != latest.tagName) {
+                releaseInfo = latest
+            }
+            delay(6 * 60 * 60 * 1000L)
+        }
+    }
 
     LaunchedEffect(settings.providerId, settings.apiKey, settings.model) {
         if (settings.providerId.isNotBlank() &&
@@ -104,7 +120,17 @@ fun AppRoot(dataDir: File, systemDark: Boolean) {
         } else {
             ChatScreen(
                 vm = vm,
-                onOpenSettings = { showSetup = true }
+                onOpenSettings = { showSetup = true },
+                releaseInfo = releaseInfo,
+                onDismissRelease = {
+                    releaseInfo?.let { runCatching { dismissedReleaseFile.writeText(it.tagName) } }
+                    releaseInfo = null
+                },
+                onOpenRelease = { url ->
+                    runCatching {
+                        if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(url))
+                    }
+                }
             )
         }
     }
