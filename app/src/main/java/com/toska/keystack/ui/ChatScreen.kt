@@ -403,6 +403,11 @@ fun ChatScreen(vm: ChatViewModel, onOpenSettings: () -> Unit) {
                             isLastAssistant = idx == lastAssistantIdx,
                             busy = busy,
                             onRegenerate = { vm.regenerate() },
+                            onEdit = {
+                                editMessageText = msg.content
+                                editMessageTarget = idx
+                            },
+                            onBranch = { vm.branchFrom(idx) },
                             fontScale = settings.fontScale,
                             maxWidth = settings.messageWidth,
                             animationsEnabled = settings.animationsEnabled
