@@ -162,7 +162,7 @@ class ChatViewModel : ViewModel() {
         _sessions.value = _sessions.value.map {
             if (it.id == sessionId) {
                 val newTitle = if (it.title == "Новый чат") {
-                    val t = text.trim()
+                    val t = text.trim().ifBlank { files.firstOrNull()?.name ?: "Вложение" }
                     t.take(40) + if (t.length > 40) "…" else ""
                 } else it.title
                 it.copy(title = newTitle, updatedAt = System.currentTimeMillis(), messages = stored, pendingPrompt = text.trim())
